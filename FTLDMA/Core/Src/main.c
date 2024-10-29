@@ -26,8 +26,8 @@
 #include <stdlib.h>
 #include <math.h>
 #include <inttypes.h>
+#include <Max31855k.h>
 #include <string.h>
-#include "Max31856.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -70,6 +70,8 @@ uint32_t resistance = 720000; //capacitance: 200~420pF
 uint16_t cgtime = 0;
 uint16_t stretch_time = 0;
 uint16_t count = 0;
+
+float temperature;
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -140,7 +142,6 @@ int main(void)
         printf("Could not initialize thermocouple\r\n");
         while (1) HAL_Delay(10);
     }
-    setThermocoupleType(MAX31856_TCTYPE_K);
   /* USER CODE END 2 */
 
   /* Infinite loop */
@@ -166,8 +167,9 @@ int main(void)
 	  if (Tim2Flag == 1){
 		  //__disable_irq();
 		  Tim2Flag = 0;
-		  readThermocoupleTemperature());
+		  temperature = readCelsius();
 		  stretch_time = stretch_time/count;
+		  printf("%.2f\r\n", temperature);
 		  //printf("%"PRIu16 "\r\n", stretch_time);
 		  stretch_time = 0;
 		  count = 0;
