@@ -1,9 +1,9 @@
 #include "Max31855K.h"
 
-
 extern SPI_HandleTypeDef hspi2;
 bool initialized = false;
 uint8_t faultMask = MAX31855_FAULT_ALL;
+uint8_t buf[4];
 
 
 /**************************************************************************/
@@ -26,7 +26,7 @@ bool begin(void) {
 double readInternal(void) {
   uint32_t v;
 
-  v = spiread32();
+  v = spi2store();
 
   // ignore bottom 4 bits - they're just thermocouple data
   v >>= 4;
@@ -54,7 +54,7 @@ double readCelsius(void) {
 
   int32_t v;
 
-  v = spiread32();
+  v = spi2store();
 
   // Serial.print("0x"); Serial.println(v, HEX);
 
@@ -84,6 +84,7 @@ double readCelsius(void) {
 
   // LSB = 0.25 degrees C
   centigrade *= 0.25;
+  //printf("%.2f\r\n", centigrade);
   return centigrade;
 }
 
@@ -130,28 +131,31 @@ void setFaultChecks(uint8_t faults) {
     @return The raw 32 bit value read.
 */
 /**************************************************************************/
-uint32_t spiread32(void) {
-  uint32_t d = 0;
-  uint8_t buf[4];
 
-  // backcompatibility!
-  if (!initialized) {
+void spi2read32(void) {
+
+  if (!initialized){
     begin();
   }
 
-  HAL_GPIO_WritePin(GPIOA , SPI2_CS_Pin, GPIO_PIN_RESET);
-  HAL_SPI_Receive(&hspi2, buf, sizeof(buf), SPI_DELAY);
-  HAL_GPIO_WritePin(GPIOA , SPI2_CS_Pin, GPIO_PIN_SET);
+  HAL_GPIO_WritePin(SPI2_CS_GPIO_Port, SPI2_CS_Pin, GPIO_PIN_RESET);
+  HAL_SPI_Receive_IT(&hspi2, buf, sizeof(buf));
+}
 
-  d = buf[0];
-  d <<= 8;
-  d |= buf[1];
-  d <<= 8;
-  d |= buf[2];
-  d <<= 8;
-  d |= buf[3];
+uint32_t spi2store(void) {
 
-  // Serial.println(d, HEX);
+	uint32_t d = 0;
+	HAL_GPIO_WritePin(SPI2_CS_GPIO_Port, SPI2_CS_Pin, GPIO_PIN_SET);
 
-  return d;
+	d = buf[0];
+	d <<= 8;
+	d |= buf[1];
+	d <<= 8;
+	d |= buf[2];
+	d <<= 8;
+	d |= buf[3];
+
+	//printf("%"PRIu32 "\r\n", d);
+
+	return d;
 }

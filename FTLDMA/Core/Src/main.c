@@ -51,6 +51,9 @@ ADC_HandleTypeDef hadc2;
 ADC_HandleTypeDef hadc3;
 DMA_HandleTypeDef hdma_adc1;
 
+DAC_HandleTypeDef hdac;
+DMA_HandleTypeDef hdma_dac1;
+
 SPI_HandleTypeDef hspi2;
 
 TIM_HandleTypeDef htim2;
@@ -61,7 +64,9 @@ UART_HandleTypeDef huart2;
 uint16_t adcBuf[ADC_BUFFER_SIZE] = {0};
 volatile uint8_t Tim2Flag = 0;
 volatile uint8_t stretch_status = 0;
-volatile uint8_t dma_flag = 0;
+volatile uint8_t dmaFlag = 0;
+volatile uint8_t spi2Flag = 0;
+volatile uint8_t tempFlag = 1;
 uint16_t adc_average = 0;
 
 uint16_t Vmax = 2620; // 3.267V 99% charged
@@ -70,8 +75,8 @@ uint32_t resistance = 720000; //capacitance: 200~420pF
 uint16_t cgtime = 0;
 uint16_t stretch_time = 0;
 uint16_t count = 0;
+double temperature = 0;
 
-float temperature;
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -84,6 +89,7 @@ static void MX_ADC2_Init(void);
 static void MX_ADC3_Init(void);
 static void MX_TIM2_Init(void);
 static void MX_SPI2_Init(void);
+static void MX_DAC_Init(void);
 /* USER CODE BEGIN PFP */
 int _write(int file, char* p, int len){
 	HAL_UART_Transmit(&huart2, p, len, 1);
@@ -131,6 +137,7 @@ int main(void)
   MX_ADC3_Init();
   MX_TIM2_Init();
   MX_SPI2_Init();
+  MX_DAC_Init();
   /* USER CODE BEGIN 2 */
   if (HAL_ADC_Start_DMA(&hadc1, adcBuf, ADC_BUFFER_SIZE) != HAL_OK)
       {
@@ -148,8 +155,8 @@ int main(void)
   /* USER CODE BEGIN WHILE */
   while (1)
   {
-	  if (dma_flag == 1){
-		  dma_flag = 0;
+	  if (dmaFlag == 1){
+		  dmaFlag = 0;
 		  Compute_ADC_Average();
 		  printf("%"PRIu16 "\r\n", adc_average);
 		  if (adc_average >= Vmax){
@@ -164,18 +171,36 @@ int main(void)
 			  stretch_status = 0; //Sensing finish
 			  //printf("%"PRIu16 "\r\n", cgtime);
 		  }
-	  if (Tim2Flag == 1){
+	  }
+
+	  if (Tim2Flag == 1 && spi2Flag == 0){
 		  //__disable_irq();
 		  Tim2Flag = 0;
-		  temperature = readCelsius();
 		  stretch_time = stretch_time/count;
+
+		  if (tempFlag == 1){
+			  tempFlag = 0;
+			  spi2read32();
+			  //printf("Hello world\r\n");
+		  }
+
 		  printf("%.2f\r\n", temperature);
 		  //printf("%"PRIu16 "\r\n", stretch_time);
+
 		  stretch_time = 0;
 		  count = 0;
 		  }
-		  //__enable_irq();
+
+
+	  if (spi2Flag == 1){
+		  spi2Flag = 0;
+		  tempFlag = 1;
+		  temperature = readCelsius();
+		  //printf("%.2f\r\n", temperature);
+		  //printf("Hello world\r\n");
 	  }
+		  //__enable_irq();
+
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
@@ -401,6 +426,46 @@ static void MX_ADC3_Init(void)
 }
 
 /**
+  * @brief DAC Initialization Function
+  * @param None
+  * @retval None
+  */
+static void MX_DAC_Init(void)
+{
+
+  /* USER CODE BEGIN DAC_Init 0 */
+
+  /* USER CODE END DAC_Init 0 */
+
+  DAC_ChannelConfTypeDef sConfig = {0};
+
+  /* USER CODE BEGIN DAC_Init 1 */
+
+  /* USER CODE END DAC_Init 1 */
+
+  /** DAC Initialization
+  */
+  hdac.Instance = DAC;
+  if (HAL_DAC_Init(&hdac) != HAL_OK)
+  {
+    Error_Handler();
+  }
+
+  /** DAC channel OUT1 config
+  */
+  sConfig.DAC_Trigger = DAC_TRIGGER_T4_TRGO;
+  sConfig.DAC_OutputBuffer = DAC_OUTPUTBUFFER_ENABLE;
+  if (HAL_DAC_ConfigChannel(&hdac, &sConfig, DAC_CHANNEL_1) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  /* USER CODE BEGIN DAC_Init 2 */
+
+  /* USER CODE END DAC_Init 2 */
+
+}
+
+/**
   * @brief SPI2 Initialization Function
   * @param None
   * @retval None
@@ -524,8 +589,12 @@ static void MX_DMA_Init(void)
 
   /* DMA controller clock enable */
   __HAL_RCC_DMA2_CLK_ENABLE();
+  __HAL_RCC_DMA1_CLK_ENABLE();
 
   /* DMA interrupt init */
+  /* DMA1_Stream5_IRQn interrupt configuration */
+  HAL_NVIC_SetPriority(DMA1_Stream5_IRQn, 0, 0);
+  HAL_NVIC_EnableIRQ(DMA1_Stream5_IRQn);
   /* DMA2_Stream0_IRQn interrupt configuration */
   HAL_NVIC_SetPriority(DMA2_Stream0_IRQn, 0, 0);
   HAL_NVIC_EnableIRQ(DMA2_Stream0_IRQn);
@@ -550,16 +619,26 @@ static void MX_GPIO_Init(void)
   __HAL_RCC_GPIOB_CLK_ENABLE();
 
   /*Configure GPIO pin Output Level */
+  HAL_GPIO_WritePin(SPI2_CS_GPIO_Port, SPI2_CS_Pin, GPIO_PIN_RESET);
+
+  /*Configure GPIO pin Output Level */
   HAL_GPIO_WritePin(CG_GPIO_Port, CG_Pin, GPIO_PIN_SET);
 
   /*Configure GPIO pin Output Level */
-  HAL_GPIO_WritePin(GPIOA, SPI2_CS_Pin|LD2_Pin, GPIO_PIN_RESET);
+  HAL_GPIO_WritePin(LD2_GPIO_Port, LD2_Pin, GPIO_PIN_RESET);
 
   /*Configure GPIO pin : B1_Pin */
   GPIO_InitStruct.Pin = B1_Pin;
   GPIO_InitStruct.Mode = GPIO_MODE_IT_FALLING;
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   HAL_GPIO_Init(B1_GPIO_Port, &GPIO_InitStruct);
+
+  /*Configure GPIO pin : SPI2_CS_Pin */
+  GPIO_InitStruct.Pin = SPI2_CS_Pin;
+  GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
+  GPIO_InitStruct.Pull = GPIO_NOPULL;
+  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
+  HAL_GPIO_Init(SPI2_CS_GPIO_Port, &GPIO_InitStruct);
 
   /*Configure GPIO pin : CG_Pin */
   GPIO_InitStruct.Pin = CG_Pin;
@@ -568,12 +647,12 @@ static void MX_GPIO_Init(void)
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_VERY_HIGH;
   HAL_GPIO_Init(CG_GPIO_Port, &GPIO_InitStruct);
 
-  /*Configure GPIO pins : SPI2_CS_Pin LD2_Pin */
-  GPIO_InitStruct.Pin = SPI2_CS_Pin|LD2_Pin;
+  /*Configure GPIO pin : LD2_Pin */
+  GPIO_InitStruct.Pin = LD2_Pin;
   GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
-  HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
+  HAL_GPIO_Init(LD2_GPIO_Port, &GPIO_InitStruct);
 
 /* USER CODE BEGIN MX_GPIO_Init_2 */
 /* USER CODE END MX_GPIO_Init_2 */
@@ -584,7 +663,7 @@ void HAL_ADC_ConvCpltCallback(ADC_HandleTypeDef* hadc)
 {
     if (hadc->Instance == ADC1)
     {
-        dma_flag = 1;
+        dmaFlag = 1;
 		if (stretch_status == 1){
 		  cgtime++;
 		}
@@ -595,7 +674,7 @@ void HAL_ADC_ConvHalfCpltCallback(ADC_HandleTypeDef* hadc)
 {
     if(hadc->Instance == ADC1)
     {
-    	dma_flag = 1;
+    	dmaFlag = 1;
 		if (stretch_status == 1){
 		  cgtime++;
 		}
@@ -606,6 +685,12 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim){
 	if(htim->Instance==TIM2){
 		Tim2Flag = 1;
 	}
+}
+
+void HAL_SPI_RxCpltCallback(SPI_HandleTypeDef *hspi) {
+    if (hspi->Instance == SPI2) {
+        spi2Flag = 1;
+    }
 }
 
 void Compute_ADC_Average(void)
