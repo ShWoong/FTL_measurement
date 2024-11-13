@@ -7,7 +7,7 @@
 #define FILTER_ORDER 2
 #define SECTIONS 2
 //#define FILTER_TAP_NUM 100
-#define SAMPLE_SIZE 100
+#define SAMPLE_SIZE 300
 #define FILTER_TAP_NUM 100
 #define HPFILTER_TAP_NUM 101
 
@@ -20,7 +20,7 @@ float STRETCH_SENSOR(void);
 float EMG_SENSOR(void);
 void FIRF_Init(void);
 float FIRF_Process(float input);
-uint16_t MAF(uint16_t new_sample);
+float MAF(float new_sample);
 /*float EWMAF(float new_measurement, float prev_ewma, float alpha);
 
 void HighPassFilter_Init(void);

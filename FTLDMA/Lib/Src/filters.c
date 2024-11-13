@@ -261,11 +261,11 @@ float HighPassFilter_Process(float input) {
 }*/
 
 /****************************************************MOVING AVERAGE FILTER****************************************************/
-uint16_t MAF(uint16_t new_sample) {
-    static uint16_t samples[SAMPLE_SIZE] = {0};
+float MAF(float new_sample) {
+    static float samples[SAMPLE_SIZE] = {0};
     static int index = 0;
-    static uint16_t sum = 0;
-    uint16_t average = 0;
+    static float sum = 0;
+    float average = 0;
 
     // 이전 합계에서 가장 오래된 샘플 제거
     sum -= samples[index];

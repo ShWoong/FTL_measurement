@@ -63,6 +63,7 @@ uint16_t adcBuf[ADC_BUFFER_SIZE] = {0};
 volatile uint8_t adcFlag = 0;
 volatile uint8_t spi2Flag = 0;
 volatile uint8_t tempFlag = 1;
+volatile uint8_t cgFlag = 0;
 uint16_t adc_average = 0;
 
 float adc_value = 0.0;
@@ -136,12 +137,19 @@ int main(void)
   /* USER CODE BEGIN WHILE */
   while (1)
   {
+	  if (spi2Flag == 1){
+	  		  spi2Flag = 0;
+	  		  tempFlag = 1;
+	  		  temperature = readCelsius();
+	  		  //printf("%.2f\r\n", temperature);
+	  		  //printf("Hello world\r\n");
+	  }
+
 	  if (adcFlag == 1 && spi2Flag == 0){
 		  adcFlag = 0;
 
-		  adc_value = HAL_ADC_GetValue(&hadc1);
 		  float filtered = BWLPF(adc_value, 10);
-		  HAL_GPIO_WritePin(GPIOC, GPIO_PIN_3, GPIO_PIN_SET);
+		  //float filtered = MAF(adc_value);
 
 		  if (tempFlag == 1){
 			  tempFlag = 0;
@@ -149,19 +157,20 @@ int main(void)
 			  //printf("Hello world\r\n");
 		  }
 
-		  printf("%.2f", temperature);
+		  //printf("%.2f", temperature);
+		  //printf(",");
+		  printf("%.2f", adc_value);
+		  //printf("%.2f", maf);
 		  printf(",");
 		  printf("%.2f\r\n", filtered);
+		  if (temperature >= 80){
+
 		  }
-
-
-	  if (spi2Flag == 1){
-		  spi2Flag = 0;
-		  tempFlag = 1;
-		  temperature = readCelsius();
-		  //printf("%.2f\r\n", temperature);
-		  //printf("Hello world\r\n");
 	  }
+
+		if(cgFlag == 0){
+
+		}
 
     /* USER CODE END WHILE */
 
@@ -265,7 +274,7 @@ static void MX_ADC1_Init(void)
   */
   sConfig.Channel = ADC_CHANNEL_0;
   sConfig.Rank = 1;
-  sConfig.SamplingTime = ADC_SAMPLETIME_3CYCLES;
+  sConfig.SamplingTime = ADC_SAMPLETIME_144CYCLES;
   if (HAL_ADC_ConfigChannel(&hadc1, &sConfig) != HAL_OK)
   {
     Error_Handler();
@@ -335,7 +344,7 @@ static void MX_TIM2_Init(void)
   htim2.Instance = TIM2;
   htim2.Init.Prescaler = 0;
   htim2.Init.CounterMode = TIM_COUNTERMODE_UP;
-  htim2.Init.Period = 89999;
+  htim2.Init.Period = 14999;
   htim2.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
   htim2.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_DISABLE;
   if (HAL_TIM_Base_Init(&htim2) != HAL_OK)
@@ -461,7 +470,7 @@ static void MX_GPIO_Init(void)
   HAL_GPIO_WritePin(CG_GPIO_Port, CG_Pin, GPIO_PIN_SET);
 
   /*Configure GPIO pin Output Level */
-  HAL_GPIO_WritePin(LD2_GPIO_Port, LD2_Pin, GPIO_PIN_RESET);
+  HAL_GPIO_WritePin(GPIOA, LD2_Pin|GPIO_PIN_8, GPIO_PIN_RESET);
 
   /*Configure GPIO pin : B1_Pin */
   GPIO_InitStruct.Pin = B1_Pin;
@@ -479,16 +488,16 @@ static void MX_GPIO_Init(void)
   /*Configure GPIO pin : CG_Pin */
   GPIO_InitStruct.Pin = CG_Pin;
   GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
-  GPIO_InitStruct.Pull = GPIO_PULLDOWN;
+  GPIO_InitStruct.Pull = GPIO_PULLUP;
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_VERY_HIGH;
   HAL_GPIO_Init(CG_GPIO_Port, &GPIO_InitStruct);
 
-  /*Configure GPIO pin : LD2_Pin */
-  GPIO_InitStruct.Pin = LD2_Pin;
+  /*Configure GPIO pins : LD2_Pin PA8 */
+  GPIO_InitStruct.Pin = LD2_Pin|GPIO_PIN_8;
   GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
-  HAL_GPIO_Init(LD2_GPIO_Port, &GPIO_InitStruct);
+  HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
 
 /* USER CODE BEGIN MX_GPIO_Init_2 */
 /* USER CODE END MX_GPIO_Init_2 */
@@ -499,8 +508,16 @@ void HAL_ADC_ConvCpltCallback(ADC_HandleTypeDef* hadc)
 {
     if (hadc->Instance == ADC1)
     {
-    	adcFlag = 1;
-    	HAL_GPIO_WritePin(GPIOC, GPIO_PIN_3, GPIO_PIN_RESET);
+    	if (cgFlag == 1){
+    		adc_value = HAL_ADC_GetValue(&hadc1);
+    		adcFlag = 1;
+    		cgFlag = 0;
+    		HAL_GPIO_WritePin(GPIOC, GPIO_PIN_3, GPIO_PIN_RESET);
+    	}
+    	else if(cgFlag == 0){
+    		cgFlag = 1;
+    		HAL_GPIO_WritePin(GPIOC, GPIO_PIN_3, GPIO_PIN_SET);
+    	}
     }
 }
 
