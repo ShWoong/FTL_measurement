@@ -66,6 +66,7 @@ volatile uint8_t tempFlag = 1;
 volatile uint8_t cgFlag = 0;
 uint16_t adc_average = 0;
 
+float prevalue = 0.0;
 float adc_value = 0.0;
 double temperature = 0.0;
 
@@ -148,8 +149,11 @@ int main(void)
 	  if (adcFlag == 1 && spi2Flag == 0){
 		  adcFlag = 0;
 
-		  float filtered = BWLPF(adc_value, 10);
+		  float filtered = BWLPF(adc_value, 4);
 		  //float filtered = MAF(adc_value);
+		  //float filtered = EWMAF(adc_value, prevalue, 0.1);
+		  float filteredt = MAF(filtered);
+		  //float prevalue = filteredt;
 
 		  if (tempFlag == 1){
 			  tempFlag = 0;
@@ -159,10 +163,12 @@ int main(void)
 
 		  //printf("%.2f", temperature);
 		  //printf(",");
-		  printf("%.2f", adc_value);
+		  //printf("%.2f", adc_value);
+		  //printf(",");
+		  printf("%.2f", filtered);
 		  //printf("%.2f", maf);
 		  printf(",");
-		  printf("%.2f\r\n", filtered);
+		  printf("%.2f\r\n", filteredt);
 		  if (temperature >= 80){
 
 		  }
@@ -274,7 +280,7 @@ static void MX_ADC1_Init(void)
   */
   sConfig.Channel = ADC_CHANNEL_0;
   sConfig.Rank = 1;
-  sConfig.SamplingTime = ADC_SAMPLETIME_144CYCLES;
+  sConfig.SamplingTime = ADC_SAMPLETIME_112CYCLES;
   if (HAL_ADC_ConfigChannel(&hadc1, &sConfig) != HAL_OK)
   {
     Error_Handler();
@@ -344,7 +350,7 @@ static void MX_TIM2_Init(void)
   htim2.Instance = TIM2;
   htim2.Init.Prescaler = 0;
   htim2.Init.CounterMode = TIM_COUNTERMODE_UP;
-  htim2.Init.Period = 14999;
+  htim2.Init.Period = 18999;
   htim2.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
   htim2.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_DISABLE;
   if (HAL_TIM_Base_Init(&htim2) != HAL_OK)
@@ -488,7 +494,7 @@ static void MX_GPIO_Init(void)
   /*Configure GPIO pin : CG_Pin */
   GPIO_InitStruct.Pin = CG_Pin;
   GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
-  GPIO_InitStruct.Pull = GPIO_PULLUP;
+  GPIO_InitStruct.Pull = GPIO_NOPULL;
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_VERY_HIGH;
   HAL_GPIO_Init(CG_GPIO_Port, &GPIO_InitStruct);
 

@@ -21,9 +21,9 @@ float EMG_SENSOR(void);
 void FIRF_Init(void);
 float FIRF_Process(float input);
 float MAF(float new_sample);
-/*float EWMAF(float new_measurement, float prev_ewma, float alpha);
+float EWMAF(float new_measurement, float prev_ewma, float alpha);
 
-void HighPassFilter_Init(void);
+/*void HighPassFilter_Init(void);
 float HighPassFilter_Process(float input);
 float applyLowPassFilter(float input);
 

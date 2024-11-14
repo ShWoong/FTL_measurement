@@ -96,22 +96,36 @@ float lpf_x_buffer20[SECTIONS][2] = {0};
 float lpf_x_buffer21[SECTIONS][2] = {0};
 float lpf_x_buffer22[SECTIONS][2] = {0};
 float lpf_x_buffer23[SECTIONS][2] = {0};
+float lpf_x_buffer30[SECTIONS][2] = {0};
 float lpf_y_buffer20[SECTIONS][2] = {0};
 float lpf_y_buffer21[SECTIONS][2] = {0};
 float lpf_y_buffer22[SECTIONS][2] = {0};
 float lpf_y_buffer23[SECTIONS][2] = {0};
+float lpf_y_buffer30[SECTIONS][2] = {0};
 
-float lpf_sos_6[SECTIONS][6] = {
-    {1.20231162e-07, 2.40462324e-07, 1.20231162e-07, 1.0, -1.93132782, 0.932701053},
-    {1.0, 2.0, 1.0, 1.0, -1.97016249, 0.971563337} //6Hz
+float lpf_sos_1[SECTIONS][6] = {
+    {4.97314931e-10, 9.94629862e-10, 4.97314931e-10, 1.0, -1.98983613, 0.98987572},
+    {1.0, 2.0, 1.0, 1.0, -1.99490314, 0.994906996} // 1Hz
+};
+float lpf_sos_2[SECTIONS][6] = {
+    {3.91767593e-09, 7.83535185e-09, 3.91767593e-09, 1.0, -1.97958423, 0.979611834},
+    {1.0, 2.0, 1.0, 1.0, -1.98983613, 0.989875721} // 2Hz
+};
+float lpf_sos_3[SECTIONS][6] = {
+    {1.08163976e-08, 2.16327951e-08, 1.08163976e-08, 1.0, -1.95903990, 0.95953147},
+    {1.0, 2.0, 1.0, 1.0, -1.98513903, 0.98565738} // 3Hz
+};
+float lpf_sos_4[SECTIONS][6] = {
+    {2.41362231e-08, 4.82724463e-08, 2.41362231e-08, 1.0, -1.95400196, 0.954619251},
+	{1.0, 2.0, 1.0, 1.0, -1.98032386, 0.980949464} //4Hz
 };
 float lpf_sos_5[SECTIONS][6] = {
 	{5.84514243e-08, 1.16902849e-07, 5.84514243e-08, 1.0, -1.94263823, 0.943597278},
 	{1.0, 2.0, 1.0, 1.0, -1.97526963, 0.976244792} //5Hz
 };
-float lpf_sos_4[SECTIONS][6] = {
-    {2.41362231e-08, 4.82724463e-08, 2.41362231e-08, 1.0, -1.95400196, 0.954619251},
-	{1.0, 2.0, 1.0, 1.0, -1.98032386, 0.980949464} //4Hz
+float lpf_sos_6[SECTIONS][6] = {
+    {1.20231162e-07, 2.40462324e-07, 1.20231162e-07, 1.0, -1.93132782, 0.932701053},
+    {1.0, 2.0, 1.0, 1.0, -1.97016249, 0.971563337} //6Hz
 };
 float lpf_sos_10[SECTIONS][6] = {
     {8.98486146e-07, 1.79697229e-06, 8.98486146e-07, 1.0, -1.88660958, 0.890339736},
@@ -131,8 +145,8 @@ float BWLPF(float input, int8_t ch) {
 		for (int i = 0; i < SECTIONS; i++) {
 			xn = (i == 0) ? input : output;
 
-			output = lpf_sos_6[i][0] * xn + lpf_sos_6[i][1] * lpf_x_buffer10[i][0] + lpf_sos_6[i][2] * lpf_x_buffer10[i][1]
-			- lpf_sos_6[i][4] * lpf_y_buffer10[i][0] - lpf_sos_6[i][5] * lpf_y_buffer10[i][1];
+			output = lpf_sos_10[i][0] * xn + lpf_sos_10[i][1] * lpf_x_buffer10[i][0] + lpf_sos_10[i][2] * lpf_x_buffer10[i][1]
+			- lpf_sos_10[i][4] * lpf_y_buffer10[i][0] - lpf_sos_10[i][5] * lpf_y_buffer10[i][1];
 
 			lpf_x_buffer10[i][1] = lpf_x_buffer10[i][0];
 			lpf_x_buffer10[i][0] = xn;
@@ -145,14 +159,56 @@ float BWLPF(float input, int8_t ch) {
 		for (int i = 0; i < SECTIONS; i++) {
 			xn = (i == 0) ? input : output;
 
-			output = lpf_sos_6[i][0] * xn + lpf_sos_6[i][1] * lpf_x_buffer20[i][0] + lpf_sos_6[i][2] * lpf_x_buffer20[i][1]
-			- lpf_sos_6[i][4] * lpf_y_buffer20[i][0] - lpf_sos_6[i][5] * lpf_y_buffer20[i][1];
+			output = lpf_sos_20[i][0] * xn + lpf_sos_20[i][1] * lpf_x_buffer20[i][0] + lpf_sos_20[i][2] * lpf_x_buffer20[i][1]
+			- lpf_sos_20[i][4] * lpf_y_buffer20[i][0] - lpf_sos_20[i][5] * lpf_y_buffer20[i][1];
 
 			lpf_x_buffer20[i][1] = lpf_x_buffer20[i][0];
 			lpf_x_buffer20[i][0] = xn;
 			lpf_y_buffer20[i][1] = lpf_y_buffer20[i][0];
 			lpf_y_buffer20[i][0] = output;
 		    }
+	}
+	else if (ch == 2){
+
+			for (int i = 0; i < SECTIONS; i++) {
+				xn = (i == 0) ? input : output;
+
+				output = lpf_sos_2[i][0] * xn + lpf_sos_2[i][1] * lpf_x_buffer20[i][0] + lpf_sos_2[i][2] * lpf_x_buffer20[i][1]
+				- lpf_sos_2[i][4] * lpf_y_buffer20[i][0] - lpf_sos_2[i][5] * lpf_y_buffer20[i][1];
+
+				lpf_x_buffer20[i][1] = lpf_x_buffer20[i][0];
+				lpf_x_buffer20[i][0] = xn;
+				lpf_y_buffer20[i][1] = lpf_y_buffer20[i][0];
+				lpf_y_buffer20[i][0] = output;
+			    }
+		}
+	else if (ch == 4){
+
+				for (int i = 0; i < SECTIONS; i++) {
+					xn = (i == 0) ? input : output;
+
+					output = lpf_sos_4[i][0] * xn + lpf_sos_4[i][1] * lpf_x_buffer20[i][0] + lpf_sos_4[i][2] * lpf_x_buffer20[i][1]
+					- lpf_sos_4[i][4] * lpf_y_buffer20[i][0] - lpf_sos_4[i][5] * lpf_y_buffer20[i][1];
+
+					lpf_x_buffer20[i][1] = lpf_x_buffer20[i][0];
+					lpf_x_buffer20[i][0] = xn;
+					lpf_y_buffer20[i][1] = lpf_y_buffer20[i][0];
+					lpf_y_buffer20[i][0] = output;
+				    }
+			}
+	else if (ch == 3){
+
+	    for (int i = 0; i < SECTIONS; i++) {
+	        xn = (i == 0) ? input : output;
+
+	        output = lpf_sos_3[i][0] * xn + lpf_sos_3[i][1] * lpf_x_buffer30[i][0] + lpf_sos_3[i][2] * lpf_x_buffer30[i][1]
+	        - lpf_sos_3[i][4] * lpf_y_buffer30[i][0] - lpf_sos_3[i][5] * lpf_y_buffer30[i][1];
+
+	        lpf_x_buffer30[i][1] = lpf_x_buffer30[i][0];
+	        lpf_x_buffer30[i][0] = xn;
+	        lpf_y_buffer30[i][1] = lpf_y_buffer30[i][0];
+	        lpf_y_buffer30[i][0] = output;
+	    }
 	}
     return output;
 }
@@ -282,11 +338,11 @@ float MAF(float new_sample) {
 }
 
 /*****************************************EXPONENTIAL WEIGHTED MOVING AVERAGE FILTER******************************************/
-/*float EWMAF(float new_measurement, float prev_ewma, float alpha) {
+float EWMAF(float new_measurement, float prev_ewma, float alpha) {
     return alpha * new_measurement + (1 - alpha) * prev_ewma;
 }
 
-void KMF_Init(KMF *kf, float init_estimate, float init_error_estimate, float error_measure) {
+/*void KMF_Init(KMF *kf, float init_estimate, float init_error_estimate, float error_measure) {
     kf->estimate = init_estimate;
     kf->error_estimate = init_error_estimate;
     kf->error_measure = error_measure;
