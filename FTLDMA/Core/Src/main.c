@@ -49,8 +49,6 @@
 /* USER CODE END PM */
 
 /* Private variables ---------------------------------------------------------*/
-ADC_HandleTypeDef hadc1;
-
 SPI_HandleTypeDef hspi2;
 
 TIM_HandleTypeDef htim2;
@@ -60,12 +58,12 @@ UART_HandleTypeDef huart2;
 
 /* USER CODE BEGIN PV */
 uint16_t adcBuf[ADC_BUFFER_SIZE] = {0};
-volatile uint8_t adcFlag = 0;
+volatile uint8_t tim4Flag = 0;
 volatile uint8_t spi2Flag = 0;
 volatile uint8_t tempFlag = 1;
 volatile uint8_t cgFlag = 0;
 uint16_t adc_average = 0;
-
+uint32_t count = 0;
 float prevalue = 0.0;
 float adc_value = 0.0;
 double temperature = 0.0;
@@ -76,7 +74,6 @@ double temperature = 0.0;
 void SystemClock_Config(void);
 static void MX_GPIO_Init(void);
 static void MX_USART2_UART_Init(void);
-static void MX_ADC1_Init(void);
 static void MX_TIM2_Init(void);
 static void MX_SPI2_Init(void);
 static void MX_TIM4_Init(void);
@@ -121,13 +118,12 @@ int main(void)
   /* Initialize all configured peripherals */
   MX_GPIO_Init();
   MX_USART2_UART_Init();
-  MX_ADC1_Init();
   MX_TIM2_Init();
   MX_SPI2_Init();
   MX_TIM4_Init();
   /* USER CODE BEGIN 2 */
-  HAL_TIM_Base_Start(&htim2);
-  HAL_ADC_Start_IT(&hadc1);
+  HAL_TIM_IC_Start_IT(&htim2, TIM_CHANNEL_1);
+  HAL_TIM_Base_Start_IT(&htim4);
   if(!begin()){
         printf("Could not initialize thermocouple\r\n");
         while (1) HAL_Delay(10);
@@ -139,25 +135,35 @@ int main(void)
   while (1)
   {
 	  if (spi2Flag == 1){
-	  		  spi2Flag = 0;
-	  		  tempFlag = 1;
-	  		  temperature = readCelsius();
+		  temperature = readCelsius();
+		  spi2Flag = 0;
+		  tempFlag = 1;
 	  		  //printf("%.2f\r\n", temperature);
 	  		  //printf("Hello world\r\n");
 	  }
 
-	  if (adcFlag == 1 && spi2Flag == 0){
-		  adcFlag = 0;
+	  if (tim4Flag == 1 && spi2Flag == 0){
+		  tim4Flag = 0;
+		  //printf("%" PRIu32 "\r\n", count);
+		  //float filtered = MAF(count);
+		  float filtered = BWLPF(count, 4);
+		  printf("%.2f\r\n", filtered);
+		  count = 0;
+		  TIM2->CNT = 0;
+		  TIM2->CCR1 = 0;
 
-		  float filtered = BWLPF(adc_value, 4);
+		  //float filtered = BWLPF(count, 4);
+		  HAL_GPIO_WritePin(GPIOC, GPIO_PIN_3, GPIO_PIN_SET);
+
+		  //float filtered = BWLPF(adc_value, 4);
 		  //float filtered = MAF(adc_value);
 		  //float filtered = EWMAF(adc_value, prevalue, 0.1);
-		  float filteredt = MAF(filtered);
+		  //float filteredt = MAF(filtered);
 		  //float prevalue = filteredt;
 
 		  if (tempFlag == 1){
 			  tempFlag = 0;
-			  spi2read32();
+			   spi2read32();
 			  //printf("Hello world\r\n");
 		  }
 
@@ -165,18 +171,23 @@ int main(void)
 		  //printf(",");
 		  //printf("%.2f", adc_value);
 		  //printf(",");
-		  printf("%.2f", filtered);
+		  //printf("%.2f\r\n", filtered);
 		  //printf("%.2f", maf);
-		  printf(",");
-		  printf("%.2f\r\n", filteredt);
+		  //printf(",");
+		  //printf("%.2f\r\n", filteredt);
 		  if (temperature >= 80){
 
 		  }
 	  }
 
-		if(cgFlag == 0){
-
-		}
+	  	  /*if (tim4Flag == 1){
+	  		  tim4Flag = 0;
+	  		  printf("%" PRIu32 "\r\n", count);
+	  		  count = 0;
+	  		  TIM2->CNT = 0;
+	  		  TIM2->CCR1 = 0;
+	  		  HAL_GPIO_WritePin(GPIOC, GPIO_PIN_3, GPIO_PIN_SET);
+	  	  }*/
 
     /* USER CODE END WHILE */
 
@@ -240,58 +251,6 @@ void SystemClock_Config(void)
 }
 
 /**
-  * @brief ADC1 Initialization Function
-  * @param None
-  * @retval None
-  */
-static void MX_ADC1_Init(void)
-{
-
-  /* USER CODE BEGIN ADC1_Init 0 */
-
-  /* USER CODE END ADC1_Init 0 */
-
-  ADC_ChannelConfTypeDef sConfig = {0};
-
-  /* USER CODE BEGIN ADC1_Init 1 */
-
-  /* USER CODE END ADC1_Init 1 */
-
-  /** Configure the global features of the ADC (Clock, Resolution, Data Alignment and number of conversion)
-  */
-  hadc1.Instance = ADC1;
-  hadc1.Init.ClockPrescaler = ADC_CLOCK_SYNC_PCLK_DIV4;
-  hadc1.Init.Resolution = ADC_RESOLUTION_12B;
-  hadc1.Init.ScanConvMode = DISABLE;
-  hadc1.Init.ContinuousConvMode = DISABLE;
-  hadc1.Init.DiscontinuousConvMode = DISABLE;
-  hadc1.Init.ExternalTrigConvEdge = ADC_EXTERNALTRIGCONVEDGE_RISING;
-  hadc1.Init.ExternalTrigConv = ADC_EXTERNALTRIGCONV_T2_TRGO;
-  hadc1.Init.DataAlign = ADC_DATAALIGN_RIGHT;
-  hadc1.Init.NbrOfConversion = 1;
-  hadc1.Init.DMAContinuousRequests = DISABLE;
-  hadc1.Init.EOCSelection = ADC_EOC_SINGLE_CONV;
-  if (HAL_ADC_Init(&hadc1) != HAL_OK)
-  {
-    Error_Handler();
-  }
-
-  /** Configure for the selected ADC regular channel its corresponding rank in the sequencer and its sample time.
-  */
-  sConfig.Channel = ADC_CHANNEL_0;
-  sConfig.Rank = 1;
-  sConfig.SamplingTime = ADC_SAMPLETIME_112CYCLES;
-  if (HAL_ADC_ConfigChannel(&hadc1, &sConfig) != HAL_OK)
-  {
-    Error_Handler();
-  }
-  /* USER CODE BEGIN ADC1_Init 2 */
-
-  /* USER CODE END ADC1_Init 2 */
-
-}
-
-/**
   * @brief SPI2 Initialization Function
   * @param None
   * @retval None
@@ -343,6 +302,7 @@ static void MX_TIM2_Init(void)
 
   TIM_ClockConfigTypeDef sClockSourceConfig = {0};
   TIM_MasterConfigTypeDef sMasterConfig = {0};
+  TIM_IC_InitTypeDef sConfigIC = {0};
 
   /* USER CODE BEGIN TIM2_Init 1 */
 
@@ -350,7 +310,7 @@ static void MX_TIM2_Init(void)
   htim2.Instance = TIM2;
   htim2.Init.Prescaler = 0;
   htim2.Init.CounterMode = TIM_COUNTERMODE_UP;
-  htim2.Init.Period = 18999;
+  htim2.Init.Period = 3999999999;
   htim2.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
   htim2.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_DISABLE;
   if (HAL_TIM_Base_Init(&htim2) != HAL_OK)
@@ -362,9 +322,21 @@ static void MX_TIM2_Init(void)
   {
     Error_Handler();
   }
+  if (HAL_TIM_IC_Init(&htim2) != HAL_OK)
+  {
+    Error_Handler();
+  }
   sMasterConfig.MasterOutputTrigger = TIM_TRGO_UPDATE;
   sMasterConfig.MasterSlaveMode = TIM_MASTERSLAVEMODE_DISABLE;
   if (HAL_TIMEx_MasterConfigSynchronization(&htim2, &sMasterConfig) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  sConfigIC.ICPolarity = TIM_INPUTCHANNELPOLARITY_RISING;
+  sConfigIC.ICSelection = TIM_ICSELECTION_DIRECTTI;
+  sConfigIC.ICPrescaler = TIM_ICPSC_DIV1;
+  sConfigIC.ICFilter = 5;
+  if (HAL_TIM_IC_ConfigChannel(&htim2, &sConfigIC, TIM_CHANNEL_1) != HAL_OK)
   {
     Error_Handler();
   }
@@ -393,9 +365,9 @@ static void MX_TIM4_Init(void)
 
   /* USER CODE END TIM4_Init 1 */
   htim4.Instance = TIM4;
-  htim4.Init.Prescaler = 0;
+  htim4.Init.Prescaler = 1;
   htim4.Init.CounterMode = TIM_COUNTERMODE_UP;
-  htim4.Init.Period = 89;
+  htim4.Init.Period = 44999;
   htim4.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
   htim4.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_DISABLE;
   if (HAL_TIM_Base_Init(&htim4) != HAL_OK)
@@ -510,7 +482,7 @@ static void MX_GPIO_Init(void)
 }
 
 /* USER CODE BEGIN 4 */
-void HAL_ADC_ConvCpltCallback(ADC_HandleTypeDef* hadc)
+/*void HAL_ADC_ConvCpltCallback(ADC_HandleTypeDef* hadc)
 {
     if (hadc->Instance == ADC1)
     {
@@ -525,6 +497,22 @@ void HAL_ADC_ConvCpltCallback(ADC_HandleTypeDef* hadc)
     		HAL_GPIO_WritePin(GPIOC, GPIO_PIN_3, GPIO_PIN_SET);
     	}
     }
+}*/
+
+void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim){
+	if(htim->Instance==TIM4){
+		tim4Flag = 1;
+	}
+}
+
+void HAL_TIM_IC_CaptureCallback(TIM_HandleTypeDef *htim){
+	if (htim->Instance == TIM2 && htim->Channel == HAL_TIM_ACTIVE_CHANNEL_1)
+	{
+		HAL_GPIO_WritePin(GPIOC, GPIO_PIN_3, GPIO_PIN_RESET);
+		count = TIM2->CCR1;
+		//TIM4->CNT = 0;
+		printf("H");
+	}
 }
 
 void HAL_SPI_RxCpltCallback(SPI_HandleTypeDef *hspi) {
