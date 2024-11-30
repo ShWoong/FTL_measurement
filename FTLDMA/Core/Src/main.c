@@ -138,7 +138,7 @@ int main(void)
 		  temperature = readCelsius();
 		  spi2Flag = 0;
 		  tempFlag = 1;
-	  		  //printf("%.2f\r\n", temperature);
+		  printf("%.2f\r\n", temperature);
 	  		  //printf("Hello world\r\n");
 	  }
 
@@ -147,12 +147,12 @@ int main(void)
 		  //printf("%" PRIu32 "\r\n", count);
 		  //float filtered = MAF(count);
 		  float filtered = BWLPF(count, 4);
+		  printf("%.2f", temperature);
+		  printf(",");
 		  printf("%.2f\r\n", filtered);
 		  count = 0;
 		  TIM2->CNT = 0;
 		  TIM2->CCR1 = 0;
-
-		  //float filtered = BWLPF(count, 4);
 		  HAL_GPIO_WritePin(GPIOC, GPIO_PIN_3, GPIO_PIN_SET);
 
 		  //float filtered = BWLPF(adc_value, 4);
@@ -442,10 +442,7 @@ static void MX_GPIO_Init(void)
   __HAL_RCC_GPIOB_CLK_ENABLE();
 
   /*Configure GPIO pin Output Level */
-  HAL_GPIO_WritePin(SPI2_CS_GPIO_Port, SPI2_CS_Pin, GPIO_PIN_RESET);
-
-  /*Configure GPIO pin Output Level */
-  HAL_GPIO_WritePin(CG_GPIO_Port, CG_Pin, GPIO_PIN_SET);
+  HAL_GPIO_WritePin(GPIOC, SPI2_CS_Pin|CG_Pin, GPIO_PIN_RESET);
 
   /*Configure GPIO pin Output Level */
   HAL_GPIO_WritePin(GPIOA, LD2_Pin|GPIO_PIN_8, GPIO_PIN_RESET);
@@ -511,7 +508,7 @@ void HAL_TIM_IC_CaptureCallback(TIM_HandleTypeDef *htim){
 		HAL_GPIO_WritePin(GPIOC, GPIO_PIN_3, GPIO_PIN_RESET);
 		count = TIM2->CCR1;
 		//TIM4->CNT = 0;
-		printf("H");
+		//printf("H");
 	}
 }
 
@@ -519,16 +516,6 @@ void HAL_SPI_RxCpltCallback(SPI_HandleTypeDef *hspi) {
     if (hspi->Instance == SPI2) {
         spi2Flag = 1;
     }
-}
-
-void Compute_ADC_Average(void)
-{
-    uint32_t sum = 0;
-    for(uint8_t i = 0; i < ADC_BUFFER_SIZE; i++)
-    {
-        sum += adcBuf[i];
-    }
-    adc_average = sum / ADC_BUFFER_SIZE;
 }
 
 void Disable_Interrupts(void)

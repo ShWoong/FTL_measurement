@@ -52,9 +52,7 @@ double readInternal(void) {
 /**************************************************************************/
 double readCelsius(void) {
 
-  int32_t v;
-
-  v = spi2store();
+  int32_t v = spi2store();
 
   // Serial.print("0x"); Serial.println(v, HEX);
 
