@@ -67,6 +67,7 @@ uint32_t count = 0;
 float prevalue = 0.0;
 float adc_value = 0.0;
 double temperature = 0.0;
+uint16_t length = 0;
 
 /* USER CODE END PV */
 
@@ -78,6 +79,7 @@ static void MX_TIM2_Init(void);
 static void MX_SPI2_Init(void);
 static void MX_TIM4_Init(void);
 /* USER CODE BEGIN PFP */
+int GetMatchingLength(float filteredValue);
 int _write(int file, char* p, int len){
 	HAL_UART_Transmit(&huart2, p, len, 1);
 	return len;
@@ -123,11 +125,17 @@ int main(void)
   MX_TIM4_Init();
   /* USER CODE BEGIN 2 */
   HAL_TIM_IC_Start_IT(&htim2, TIM_CHANNEL_1);
+  HAL_TIM_IC_Start_IT(&htim2, TIM_CHANNEL_2);
   HAL_TIM_Base_Start_IT(&htim4);
   if(!begin()){
         printf("Could not initialize thermocouple\r\n");
         while (1) HAL_Delay(10);
   }
+  FIR_Init(151, 1, 500.0);
+  float alpha = 0.98;  // ?��?�� 계수 (?��?��?���? 과거 ?��?��?�� �?중치 증�?)
+  float prev_output = 0;  // 초기 출력�? (?��?�� ?��?�� 초기?��)
+
+  printf("Tau\r\n");
   /* USER CODE END 2 */
 
   /* Infinite loop */
@@ -138,57 +146,41 @@ int main(void)
 		  temperature = readCelsius();
 		  spi2Flag = 0;
 		  tempFlag = 1;
-		  printf("%.2f\r\n", temperature);
-	  		  //printf("Hello world\r\n");
+		  //printf("%.2f\r\n", temperature);
 	  }
 
 	  if (tim4Flag == 1 && spi2Flag == 0){
 		  tim4Flag = 0;
 		  //printf("%" PRIu32 "\r\n", count);
 		  //float filtered = MAF(count);
-		  float filtered = BWLPF(count, 4);
-		  printf("%.2f", temperature);
-		  printf(",");
-		  printf("%.2f\r\n", filtered);
+		  //float filtered_signal = FIR_Process(count);
+		  float filtered2 = IntegralFilter(count, &prev_output, alpha);
+		  float filtered = BWLPF(filtered2, 4);
+		  length = GetMatchingLength(filtered);
+
+		  //float filtered2 = BWLPF_1st(count, 3);
+		  //printf("%.2f", temperature);
+		  //printf("%" PRIu32, count);
+		  //printf(",");
+		  //printf("%.2f", filtered2);
+		  //printf("%.2f", filtered);
+		  //printf(",");
+		  //printf("%.2f\r\n", filtered);
+		  printf("%" PRIu16 "\r\n", length);
 		  count = 0;
 		  TIM2->CNT = 0;
 		  TIM2->CCR1 = 0;
 		  HAL_GPIO_WritePin(GPIOC, GPIO_PIN_3, GPIO_PIN_SET);
 
-		  //float filtered = BWLPF(adc_value, 4);
-		  //float filtered = MAF(adc_value);
-		  //float filtered = EWMAF(adc_value, prevalue, 0.1);
-		  //float filteredt = MAF(filtered);
-		  //float prevalue = filteredt;
-
 		  if (tempFlag == 1){
 			  tempFlag = 0;
 			   spi2read32();
-			  //printf("Hello world\r\n");
 		  }
 
-		  //printf("%.2f", temperature);
-		  //printf(",");
-		  //printf("%.2f", adc_value);
-		  //printf(",");
-		  //printf("%.2f\r\n", filtered);
-		  //printf("%.2f", maf);
-		  //printf(",");
-		  //printf("%.2f\r\n", filteredt);
 		  if (temperature >= 80){
 
 		  }
 	  }
-
-	  	  /*if (tim4Flag == 1){
-	  		  tim4Flag = 0;
-	  		  printf("%" PRIu32 "\r\n", count);
-	  		  count = 0;
-	  		  TIM2->CNT = 0;
-	  		  TIM2->CCR1 = 0;
-	  		  HAL_GPIO_WritePin(GPIOC, GPIO_PIN_3, GPIO_PIN_SET);
-	  	  }*/
-
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
@@ -308,7 +300,7 @@ static void MX_TIM2_Init(void)
 
   /* USER CODE END TIM2_Init 1 */
   htim2.Instance = TIM2;
-  htim2.Init.Prescaler = 0;
+  htim2.Init.Prescaler = 69;
   htim2.Init.CounterMode = TIM_COUNTERMODE_UP;
   htim2.Init.Period = 3999999999;
   htim2.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
@@ -335,7 +327,7 @@ static void MX_TIM2_Init(void)
   sConfigIC.ICPolarity = TIM_INPUTCHANNELPOLARITY_RISING;
   sConfigIC.ICSelection = TIM_ICSELECTION_DIRECTTI;
   sConfigIC.ICPrescaler = TIM_ICPSC_DIV1;
-  sConfigIC.ICFilter = 5;
+  sConfigIC.ICFilter = 15;
   if (HAL_TIM_IC_ConfigChannel(&htim2, &sConfigIC, TIM_CHANNEL_1) != HAL_OK)
   {
     Error_Handler();
@@ -365,9 +357,9 @@ static void MX_TIM4_Init(void)
 
   /* USER CODE END TIM4_Init 1 */
   htim4.Instance = TIM4;
-  htim4.Init.Prescaler = 1;
+  htim4.Init.Prescaler = 4;
   htim4.Init.CounterMode = TIM_COUNTERMODE_UP;
-  htim4.Init.Period = 44999;
+  htim4.Init.Period = 59999;
   htim4.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
   htim4.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_DISABLE;
   if (HAL_TIM_Base_Init(&htim4) != HAL_OK)
@@ -507,8 +499,6 @@ void HAL_TIM_IC_CaptureCallback(TIM_HandleTypeDef *htim){
 	{
 		HAL_GPIO_WritePin(GPIOC, GPIO_PIN_3, GPIO_PIN_RESET);
 		count = TIM2->CCR1;
-		//TIM4->CNT = 0;
-		//printf("H");
 	}
 }
 
@@ -516,6 +506,112 @@ void HAL_SPI_RxCpltCallback(SPI_HandleTypeDef *hspi) {
     if (hspi->Instance == SPI2) {
         spi2Flag = 1;
     }
+}
+
+int GetMatchingLength(float filteredValue) {
+    if (filteredValue <= 413) return 105;
+    else if (filteredValue > 413 && filteredValue <= 415) return 106;
+    else if (filteredValue > 415 && filteredValue <= 417) return 107;
+    else if (filteredValue > 417 && filteredValue <= 419) return 108;
+    else if (filteredValue > 419 && filteredValue <= 421) return 109;
+    else if (filteredValue > 421 && filteredValue <= 423) return 110;
+    else if (filteredValue > 423 && filteredValue <= 425) return 111;
+    else if (filteredValue > 425 && filteredValue <= 427) return 112;
+    else if (filteredValue > 427 && filteredValue <= 429) return 113;
+    else if (filteredValue > 429 && filteredValue <= 431) return 114;
+    else if (filteredValue > 431 && filteredValue <= 433) return 115;
+    else if (filteredValue > 433 && filteredValue <= 435) return 116;
+    else if (filteredValue > 435 && filteredValue <= 437) return 117;
+    else if (filteredValue > 437 && filteredValue <= 439) return 118;
+    else if (filteredValue > 439 && filteredValue <= 441) return 119;
+    else if (filteredValue > 441 && filteredValue <= 443) return 120;
+    else if (filteredValue > 443 && filteredValue <= 445) return 121;
+    else if (filteredValue > 445 && filteredValue <= 447) return 122;
+    else if (filteredValue > 447 && filteredValue <= 449) return 123;
+    else if (filteredValue > 449 && filteredValue <= 451) return 124;
+    else if (filteredValue > 451 && filteredValue <= 453) return 125;
+    else if (filteredValue > 453 && filteredValue <= 455) return 126;
+    else if (filteredValue > 455 && filteredValue <= 457) return 127;
+    else if (filteredValue > 457 && filteredValue <= 459) return 128;
+    else if (filteredValue > 459 && filteredValue <= 461) return 129;
+    else if (filteredValue > 461 && filteredValue <= 463) return 130;
+    else if (filteredValue > 463 && filteredValue <= 465) return 131;
+    else if (filteredValue > 465 && filteredValue <= 467) return 132;
+    else if (filteredValue > 467 && filteredValue <= 469) return 133;
+    else if (filteredValue > 469 && filteredValue <= 471) return 134;
+    else if (filteredValue > 471 && filteredValue <= 473) return 135;
+    else if (filteredValue > 473 && filteredValue <= 475) return 136;
+    else if (filteredValue > 475 && filteredValue <= 477) return 137;
+    else if (filteredValue > 477 && filteredValue <= 479) return 138;
+    else if (filteredValue > 479 && filteredValue <= 481) return 139;
+    else if (filteredValue > 481 && filteredValue <= 483) return 140;
+    else if (filteredValue > 483 && filteredValue <= 485) return 141;
+    else if (filteredValue > 485 && filteredValue <= 487) return 142;
+    else if (filteredValue > 487 && filteredValue <= 489) return 143;
+    else if (filteredValue > 489 && filteredValue <= 491) return 144;
+    else if (filteredValue > 491 && filteredValue <= 493) return 145;
+    else if (filteredValue > 493 && filteredValue <= 495) return 146;
+    else if (filteredValue > 495 && filteredValue <= 497) return 147;
+    else if (filteredValue > 497 && filteredValue <= 499) return 148;
+    else if (filteredValue > 499 && filteredValue <= 501) return 149;
+    else if (filteredValue > 501 && filteredValue <= 503) return 150;
+    else if (filteredValue > 503 && filteredValue <= 505) return 151;
+    else if (filteredValue > 505 && filteredValue <= 507) return 152;
+    else if (filteredValue > 507 && filteredValue <= 509) return 153;
+    else if (filteredValue > 509 && filteredValue <= 511) return 154;
+    else if (filteredValue > 511 && filteredValue <= 513) return 155;
+    else if (filteredValue > 513 && filteredValue <= 515) return 156;
+    else if (filteredValue > 515 && filteredValue <= 517) return 157;
+    else if (filteredValue > 517 && filteredValue <= 519) return 158;
+    else if (filteredValue > 519 && filteredValue <= 521) return 159;
+    else if (filteredValue > 521 && filteredValue <= 523) return 160;
+    else if (filteredValue > 523 && filteredValue <= 525) return 161;
+    else if (filteredValue > 525 && filteredValue <= 527) return 162;
+    else if (filteredValue > 527 && filteredValue <= 529) return 163;
+    else if (filteredValue > 529 && filteredValue <= 531) return 164;
+    else if (filteredValue > 531 && filteredValue <= 533) return 165;
+    else if (filteredValue > 533 && filteredValue <= 535) return 166;
+    else if (filteredValue > 535 && filteredValue <= 537) return 167;
+    else if (filteredValue > 537 && filteredValue <= 539) return 168;
+    else if (filteredValue > 539 && filteredValue <= 541) return 169;
+    else if (filteredValue > 541 && filteredValue <= 543) return 170;
+    else if (filteredValue > 543 && filteredValue <= 545) return 171;
+    else if (filteredValue > 545 && filteredValue <= 547) return 172;
+    else if (filteredValue > 547 && filteredValue <= 549) return 173;
+    else if (filteredValue > 549 && filteredValue <= 551) return 174;
+    else if (filteredValue > 551 && filteredValue <= 553) return 175;
+    else if (filteredValue > 553 && filteredValue <= 555) return 176;
+    else if (filteredValue > 555 && filteredValue <= 557) return 177;
+    else if (filteredValue > 557 && filteredValue <= 559) return 178;
+    else if (filteredValue > 559 && filteredValue <= 561) return 179;
+    else if (filteredValue > 561 && filteredValue <= 563) return 180;
+    else if (filteredValue > 563 && filteredValue <= 565) return 181;
+    else if (filteredValue > 565 && filteredValue <= 567) return 182;
+    else if (filteredValue > 567 && filteredValue <= 569) return 183;
+    else if (filteredValue > 569 && filteredValue <= 571) return 184;
+    else if (filteredValue > 571 && filteredValue <= 573) return 185;
+    else if (filteredValue > 573 && filteredValue <= 575) return 186;
+    else if (filteredValue > 575 && filteredValue <= 577) return 187;
+    else if (filteredValue > 577 && filteredValue <= 579) return 188;
+    else if (filteredValue > 579 && filteredValue <= 581) return 189;
+    else if (filteredValue > 581 && filteredValue <= 583) return 190;
+    else if (filteredValue > 583 && filteredValue <= 585) return 191;
+    else if (filteredValue > 585 && filteredValue <= 587) return 192;
+    else if (filteredValue > 587 && filteredValue <= 589) return 193;
+    else if (filteredValue > 589 && filteredValue <= 591) return 194;
+    else if (filteredValue > 591 && filteredValue <= 593) return 195;
+    else if (filteredValue > 593 && filteredValue <= 595) return 196;
+    else if (filteredValue > 595 && filteredValue <= 597) return 197;
+    else if (filteredValue > 597 && filteredValue <= 599) return 198;
+    else if (filteredValue > 599 && filteredValue <= 601) return 199;
+    else if (filteredValue > 601 && filteredValue <= 603) return 200;
+    else if (filteredValue > 603 && filteredValue <= 605) return 201;
+    else if (filteredValue > 605 && filteredValue <= 607) return 202;
+    else if (filteredValue > 607 && filteredValue <= 609) return 203;
+    else if (filteredValue > 609 && filteredValue <= 611) return 204;
+    else if (filteredValue > 611 && filteredValue <= 613) return 205;
+
+    return 0; // No match
 }
 
 void Disable_Interrupts(void)

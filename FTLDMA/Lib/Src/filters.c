@@ -80,6 +80,20 @@ float BWHPF(float input, int8_t ch) {
 	return output;
 }
 
+/*******************************************INTEGRAL FILTER*******************************************/
+/**
+ * @brief 적분 필터: 입력 신호를 적분하여 DC 성분을 평활화.
+ * @param input: 현재 입력 신호.
+ * @param prev_output: 이전 출력값 (필터 상태 유지용).
+ * @param alpha: 필터 계수 (0.0 ~ 1.0).
+ * @return 필터링된 출력값.
+ */
+float IntegralFilter(float input, float *prev_output, float alpha) {
+    // 적분 계산
+    *prev_output = alpha * (*prev_output) + (1 - alpha) * input;
+    return *prev_output;
+}
+
 /*************************************************BUTTERWORTH LOW PASS FILTER*************************************************/
 /*INITILAIZING*/
 /*ADC1(EMG)*/
@@ -104,28 +118,28 @@ float lpf_y_buffer23[SECTIONS][2] = {0};
 float lpf_y_buffer30[SECTIONS][2] = {0};
 
 float lpf_sos_1[SECTIONS][6] = {
-    {4.97314931e-10, 9.94629862e-10, 4.97314931e-10, 1.0, -1.98983613, 0.98987572},
-    {1.0, 2.0, 1.0, 1.0, -1.99490314, 0.994906996} // 1Hz
-};
+		{8.76555488e-05, 1.75311098e-04, 8.76555488e-05, 1.00000000e+00, -1.97334425e+00, 9.73694872e-01},
+		}; // 1.5 Hz
+
 float lpf_sos_2[SECTIONS][6] = {
-    {3.91767593e-09, 7.83535185e-09, 3.91767593e-09, 1.0, -1.97958423, 0.979611834},
-    {1.0, 2.0, 1.0, 1.0, -1.98983613, 0.989875721} // 2Hz
-};
+		{1.55148423e-04, 3.10296847e-04, 1.55148423e-04, 1.00000000e+00, -1.96446058e+00, 9.65081174e-01},
+		}; // 2 Hz
+
 float lpf_sos_3[SECTIONS][6] = {
-    {1.08163976e-08, 2.16327951e-08, 1.08163976e-08, 1.0, -1.95903990, 0.95953147},
-    {1.0, 2.0, 1.0, 1.0, -1.98513903, 0.98565738} // 3Hz
-};
+    {3.46041338e-04, 6.92082675e-04, 3.46041338e-04, 1.00000000e+00, -1.94669754e+00, 9.48081706e-01},
+}; // 3 Hz
+
 float lpf_sos_4[SECTIONS][6] = {
-    {2.41362231e-08, 4.82724463e-08, 2.41362231e-08, 1.0, -1.95400196, 0.954619251},
-	{1.0, 2.0, 1.0, 1.0, -1.98032386, 0.980949464} //4Hz
-};
+    {6.09854719e-04, 1.21970944e-03, 6.09854719e-04, 1.00000000e+00, -1.92894226e+00, 9.31381682e-01},
+}; // 4 Hz
+
 float lpf_sos_5[SECTIONS][6] = {
-	{5.84514243e-08, 1.16902849e-07, 5.84514243e-08, 1.0, -1.94263823, 0.943597278},
-	{1.0, 2.0, 1.0, 1.0, -1.97526963, 0.976244792} //5Hz
+	{0.00324804, 0.00649608, 0.00324804, 1.0, -1.85628891, 0.87039432},
+	{1.0, 2.0, 1.0, 1.0, -1.96920477, 0.97469157}
 };
 float lpf_sos_6[SECTIONS][6] = {
-    {1.20231162e-07, 2.40462324e-07, 1.20231162e-07, 1.0, -1.93132782, 0.932701053},
-    {1.0, 2.0, 1.0, 1.0, -1.97016249, 0.971563337} //6Hz
+	{0.00468257, 0.00936514, 0.00468257, 1.0, -1.82490773, 0.84708173},
+	{1.0, 2.0, 1.0, 1.0, -1.95916512, 0.96483797}
 };
 float lpf_sos_10[SECTIONS][6] = {
     {8.98486146e-07, 1.79697229e-06, 8.98486146e-07, 1.0, -1.88660958, 0.890339736},
@@ -213,54 +227,107 @@ float BWLPF(float input, int8_t ch) {
     return output;
 }
 
+/*************************************************FIRST-ORDER BUTTERWORTH LOW PASS FILTER*************************************************/
+float lpf1_sos_1Hz[1][6] = {
+		{6.24403505e-03, 6.24403505e-03, 0.00000000e+00, 1.00000000e+00, -9.87511930e-01, 0.00000000e+00},
+		}; // 1 Hz
+float lpf1_sos_2Hz[1][6] = {
+		{1.24110619e-02, 1.24110619e-02, 0.00000000e+00, 1.00000000e+00, -9.75177876e-01, 0.00000000e+00},
+		}; // 2 Hz
+/* 2Hz 1차 필터 계수 */
+float lpf1_sos_3Hz[1][6] = {
+		{1.85029745e-02, 1.85029745e-02, 0.00000000e+00, 1.00000000e+00, -9.62994051e-01, 0.00000000e+00},
+		}; // 3 Hz
+
+/* 입력 및 출력 버퍼 */
+float lpf1_x_buffer[1] = {0};
+float lpf1_y_buffer[1] = {0};
+
+float BWLPF_1st(float input, int8_t ch) {
+    float output = 0;
+    float xn = input; // 현재 입력 신호
+
+    if (ch == 1) { // 1Hz 1차 필터
+            output = lpf1_sos_1Hz[0][0] * xn
+                   + lpf1_sos_1Hz[0][1] * lpf1_x_buffer[0]
+                   - lpf1_sos_1Hz[0][4] * lpf1_y_buffer[0];
+
+            lpf1_x_buffer[0] = xn;         // 입력 버퍼 업데이트
+            lpf1_y_buffer[0] = output;    // 출력 버퍼 업데이트
+        }
+    else if (ch == 2) { // 2Hz 1차 필터
+        output = lpf1_sos_2Hz[0][0] * xn
+               + lpf1_sos_2Hz[0][1] * lpf1_x_buffer[0]
+               - lpf1_sos_2Hz[0][4] * lpf1_y_buffer[0];
+
+        lpf1_x_buffer[0] = xn;         // 입력 버퍼 업데이트
+        lpf1_y_buffer[0] = output;    // 출력 버퍼 업데이트
+    } else if (ch == 3) { // 3Hz 1차 필터
+        output = lpf1_sos_3Hz[0][0] * xn
+               + lpf1_sos_3Hz[0][1] * lpf1_x_buffer[0]
+               - lpf1_sos_3Hz[0][4] * lpf1_y_buffer[0];
+
+        lpf1_x_buffer[0] = xn;         // 입력 버퍼 업데이트
+        lpf1_y_buffer[0] = output;    // 출력 버퍼 업데이트
+    } else {
+        // 지원하지 않는 채널
+        output = xn;
+    }
+
+    return output;
+}
+
 /*******************************************FINITE IMPULSE RESPONSE LOW PASS FILTER*******************************************/
-/*static float firFilterCoeffs[FILTER_TAP_NUM] = {
-    // 여기에 계산된 계수 넣기
-    0.00149401, 0.00151131, 0.00156314, 0.00164928, 0.00176939,
-    0.00192298, 0.00210944, 0.00232802, 0.00257783, 0.00285788,
-    0.00316703, 0.00350404, 0.00386755, 0.0042561 , 0.00466813,
-    0.00510197, 0.00555589, 0.00602804, 0.00651654, 0.00701941,
-    0.00753463, 0.00806013, 0.00859378, 0.00913344, 0.00967695,
-    0.0102221 , 0.0107667 , 0.01130856, 0.01184551, 0.01237536,
-    0.012896  , 0.01340533, 0.01390129, 0.01438189, 0.01484519,
-    0.01528933, 0.01571251, 0.01611304, 0.0164893 , 0.01683977,
-    0.01716305, 0.01745783, 0.01772293, 0.01795727, 0.01815992,
-    0.01833005, 0.01846699, 0.01857018, 0.0186392 , 0.01867379,
-    0.01867379, 0.0186392 , 0.01857018, 0.01846699, 0.01833005,
-    0.01815992, 0.01795727, 0.01772293, 0.01745783, 0.01716305,
-    0.01683977, 0.0164893 , 0.01611304, 0.01571251, 0.01528933,
-    0.01484519, 0.01438189, 0.01390129, 0.01340533, 0.012896  ,
-    0.01237536, 0.01184551, 0.01130856, 0.0107667 , 0.0102221 ,
-    0.00967695, 0.00913344, 0.00859378, 0.00806013, 0.00753463,
-    0.00701941, 0.00651654, 0.00602804, 0.00555589, 0.00510197,
-    0.00466813, 0.0042561 , 0.00386755, 0.00350404, 0.00316703,
-    0.00285788, 0.00257783, 0.00232802, 0.00210944, 0.00192298,
-    0.00176939, 0.00164928, 0.00156314, 0.00151131, 0.00149401
-};
+/* FIR 필터 계수 및 상태 */
+static float *fir_coeff = NULL; // 필터 계수
+static float *fir_state = NULL; // 상태 저장
+static int fir_num_taps = 0;    // 탭 수
 
-float firFilterState[FILTER_TAP_NUM] = {0};
+/* FIR 필터 초기화 */
+void FIR_Init(int num_taps, float cutoff_freq, float fs) {
+    if (fir_coeff != NULL) {
+        free(fir_coeff); // 이전 메모리 해제
+    }
+    if (fir_state != NULL) {
+        free(fir_state);
+    }
 
-// FIR 필터 초기화 함수
-void FIRF_Init(void) {
-    // 필터 상태 초기화
-    for (int i = 0; i < FILTER_TAP_NUM; ++i) {
-        firFilterState[i] = 0;
+    fir_num_taps = num_taps;
+    fir_coeff = (float *)malloc(num_taps * sizeof(float));
+    fir_state = (float *)calloc(num_taps, sizeof(float));
+
+    if (fir_coeff == NULL || fir_state == NULL) {
+        // 메모리 할당 실패 시 처리
+        exit(1);
+    }
+
+    // FIR 계수 계산 (Hamming 윈도우 사용)
+    float nyquist = fs / 2.0;
+    float normalized_cutoff = cutoff_freq / nyquist;
+    for (int i = 0; i < num_taps; i++) {
+        if (i == (num_taps - 1) / 2) {
+            fir_coeff[i] = normalized_cutoff;
+        } else {
+            float n = i - (num_taps - 1) / 2.0;
+            fir_coeff[i] = sinf(M_PI * normalized_cutoff * n) / (M_PI * n);
+            fir_coeff[i] *= 0.54 - 0.46 * cosf(2.0 * M_PI * i / (num_taps - 1)); // Hamming 윈도우 적용
+        }
     }
 }
 
-// FIR 필터 처리 함수
-float FIRF_Process(float input) {
+/* FIR 필터 처리 */
+float FIR_Process(float input) {
+    float output = 0.0;
 
-    // 상태 배열 업데이트 (가장 오래된 값을 버리고, 새로운 입력을 배열의 처음에 추가)
-    for (int i = FILTER_TAP_NUM - 1; i > 0; --i) {
-        firFilterState[i] = firFilterState[i - 1];
+    // 상태 배열 업데이트
+    for (int i = fir_num_taps - 1; i > 0; i--) {
+        fir_state[i] = fir_state[i - 1];
     }
-    firFilterState[0] = input;
+    fir_state[0] = input;
 
-    // FIR 필터 적용 (계수와 상태 배열의 곱의 합 계산)
-    float output = 0;
-    for (int i = 0; i < FILTER_TAP_NUM; ++i) {
-        output += firFilterState[i] * firFilterCoeffs[i];
+    // FIR 필터링 수행
+    for (int i = 0; i < fir_num_taps; i++) {
+        output += fir_state[i] * fir_coeff[i];
     }
 
     return output;
