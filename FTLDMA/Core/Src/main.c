@@ -53,6 +53,7 @@ TIM_HandleTypeDef htim2;
 TIM_HandleTypeDef htim4;
 
 UART_HandleTypeDef huart2;
+UART_HandleTypeDef huart3;
 
 /* USER CODE BEGIN PV */
 volatile uint8_t tim4Flag = 0;
@@ -61,6 +62,8 @@ volatile uint8_t tempFlag = 1;
 uint32_t count = 0;
 double temperature = 0.0;
 uint16_t length = 0; //Length of stretch sensor
+float load_buf;
+float load;
 
 float alpha = 0.98;  //Coefficient of integral filter
 float prev_output = 0;  //Previous value of integral filter
@@ -73,6 +76,7 @@ static void MX_USART2_UART_Init(void);
 static void MX_TIM2_Init(void);
 static void MX_SPI2_Init(void);
 static void MX_TIM4_Init(void);
+static void MX_USART3_UART_Init(void);
 /* USER CODE BEGIN PFP */
 int GetMatchingLength(float filteredValue);
 int _write(int file, char* p, int len){
@@ -118,6 +122,7 @@ int main(void)
   MX_TIM2_Init();
   MX_SPI2_Init();
   MX_TIM4_Init();
+  MX_USART3_UART_Init();
   /* USER CODE BEGIN 2 */
   HAL_TIM_IC_Start_IT(&htim2, TIM_CHANNEL_1);
   HAL_TIM_Base_Start_IT(&htim4);
@@ -155,6 +160,10 @@ int main(void)
 		  if (tempFlag == 1){
 			  tempFlag = 0;
 			   spi2read32();
+		  }
+
+		  if(HAL_UART_Receive(&huart3, (uint8_t *)&load_buf, sizeof(float), 0) == HAL_OK){
+			  load = load_buf;
 		  }
 
 		  if (temperature >= 80){
@@ -397,6 +406,39 @@ static void MX_USART2_UART_Init(void)
 }
 
 /**
+  * @brief USART3 Initialization Function
+  * @param None
+  * @retval None
+  */
+static void MX_USART3_UART_Init(void)
+{
+
+  /* USER CODE BEGIN USART3_Init 0 */
+
+  /* USER CODE END USART3_Init 0 */
+
+  /* USER CODE BEGIN USART3_Init 1 */
+
+  /* USER CODE END USART3_Init 1 */
+  huart3.Instance = USART3;
+  huart3.Init.BaudRate = 115200;
+  huart3.Init.WordLength = UART_WORDLENGTH_8B;
+  huart3.Init.StopBits = UART_STOPBITS_1;
+  huart3.Init.Parity = UART_PARITY_NONE;
+  huart3.Init.Mode = UART_MODE_TX_RX;
+  huart3.Init.HwFlowCtl = UART_HWCONTROL_NONE;
+  huart3.Init.OverSampling = UART_OVERSAMPLING_16;
+  if (HAL_UART_Init(&huart3) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  /* USER CODE BEGIN USART3_Init 2 */
+
+  /* USER CODE END USART3_Init 2 */
+
+}
+
+/**
   * @brief GPIO Initialization Function
   * @param None
   * @retval None
@@ -590,7 +632,7 @@ int GetMatchingLength(float filteredValue) {
     else if (filteredValue > 41705.48286 && filteredValue <= 41821.65321) return 208;
     else if (filteredValue > 41821.65321 && filteredValue <= 41937.82355) return 209;
     else if (filteredValue > 41937.82355) return 210;
-    return 0; // 매칭되지 않음
+    return 0; // 매칭?���? ?��?��
 }
 
 
