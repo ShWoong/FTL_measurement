@@ -62,7 +62,7 @@ volatile uint8_t tempFlag = 1;
 uint32_t count = 0;
 double temperature = 0.0;
 uint16_t length = 0; //Length of stretch sensor
-float load_buf;
+uint8_t load_buf[20];
 float load;
 
 float alpha = 0.98;  //Coefficient of integral filter
@@ -126,6 +126,7 @@ int main(void)
   /* USER CODE BEGIN 2 */
   HAL_TIM_IC_Start_IT(&htim2, TIM_CHANNEL_1);
   HAL_TIM_Base_Start_IT(&htim4);
+  HAL_UART_Receive_IT(&huart3, load_buf, 6);
 
   if(!begin()){
         printf("Could not initialize thermocouple\r\n");
@@ -151,6 +152,8 @@ int main(void)
 
 		  printf("%.2f", temperature);
 		  printf(",");
+		  printf("%.2f", load);
+		  printf(",");
 		  printf("%" PRIu16 "\r\n", length);
 		  count = 0;
 		  TIM2->CNT = 0;
@@ -160,10 +163,6 @@ int main(void)
 		  if (tempFlag == 1){
 			  tempFlag = 0;
 			   spi2read32();
-		  }
-
-		  if(HAL_UART_Receive(&huart3, (uint8_t *)&load_buf, sizeof(float), 0) == HAL_OK){
-			  load = load_buf;
 		  }
 
 		  if (temperature >= 80){
@@ -388,7 +387,7 @@ static void MX_USART2_UART_Init(void)
 
   /* USER CODE END USART2_Init 1 */
   huart2.Instance = USART2;
-  huart2.Init.BaudRate = 921600;
+  huart2.Init.BaudRate = 460800;
   huart2.Init.WordLength = UART_WORDLENGTH_8B;
   huart2.Init.StopBits = UART_STOPBITS_1;
   huart2.Init.Parity = UART_PARITY_NONE;
@@ -493,23 +492,6 @@ static void MX_GPIO_Init(void)
 }
 
 /* USER CODE BEGIN 4 */
-/*void HAL_ADC_ConvCpltCallback(ADC_HandleTypeDef* hadc)
-{
-    if (hadc->Instance == ADC1)
-    {
-    	if (cgFlag == 1){
-    		adc_value = HAL_ADC_GetValue(&hadc1);
-    		adcFlag = 1;
-    		cgFlag = 0;
-    		HAL_GPIO_WritePin(GPIOC, GPIO_PIN_3, GPIO_PIN_RESET);
-    	}
-    	else if(cgFlag == 0){
-    		cgFlag = 1;
-    		HAL_GPIO_WritePin(GPIOC, GPIO_PIN_3, GPIO_PIN_SET);
-    	}
-    }
-}*/
-
 void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim){
 	if(htim->Instance==TIM4){
 		tim4Flag = 1;
@@ -528,6 +510,13 @@ void HAL_SPI_RxCpltCallback(SPI_HandleTypeDef *hspi) {
     if (hspi->Instance == SPI2) {
         spi2Flag = 1;
     }
+}
+
+void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart) {
+	if (huart->Instance == USART3) {
+		sscanf((char *)load_buf, "%f", &load);
+		HAL_UART_Receive_IT(&huart3, load_buf, 6); // 6바이?�� ?��?��
+	}
 }
 
 int GetMatchingLength(float filteredValue) {
@@ -632,7 +621,7 @@ int GetMatchingLength(float filteredValue) {
     else if (filteredValue > 41705.48286 && filteredValue <= 41821.65321) return 208;
     else if (filteredValue > 41821.65321 && filteredValue <= 41937.82355) return 209;
     else if (filteredValue > 41937.82355) return 210;
-    return 0; // 매칭?���? ?��?��
+    return 0; // 매칭?���?????? ?��?��
 }
 
 
