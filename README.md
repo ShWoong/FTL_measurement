@@ -6,4 +6,4 @@ MCU: STM32F446RE
 Thermocouple: Max31855K(K-type)(Sparkfun)
 Stretch sensor: EC100-N-421-A01(Taiwan alpha)
 
-The code consists of SPI communication for temperature measurement, and timer rising edge capture for length measurement.
+The code consists of SPI communication for temperature measurement, timer rising edge capture for length measurement, and USART serial communication with arduino UNO for force measurement by loadcell .
