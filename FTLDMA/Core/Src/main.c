@@ -59,11 +59,15 @@ UART_HandleTypeDef huart3;
 volatile uint8_t tim4Flag = 0;
 volatile uint8_t spi2Flag = 0;
 volatile uint8_t tempFlag = 1;
+volatile uint8_t expFlag = 0;
+volatile uint8_t actFlag = 0;
 uint32_t count = 0;
 double temperature = 0.0;
 uint16_t length = 0; //Length of stretch sensor
 uint8_t load_buf[20];
 float load;
+uint8_t sign;
+
 
 float alpha = 0.98;  //Coefficient of integral filter
 float prev_output = 0;  //Previous value of integral filter
@@ -127,6 +131,7 @@ int main(void)
   HAL_TIM_IC_Start_IT(&htim2, TIM_CHANNEL_1);
   HAL_TIM_Base_Start_IT(&htim4);
   HAL_UART_Receive_IT(&huart3, load_buf, 6);
+  HAL_UART_Receive_IT(&huart2, &sign, 1);
 
   if(!begin()){
         printf("Could not initialize thermocouple\r\n");
@@ -165,8 +170,11 @@ int main(void)
 			   spi2read32();
 		  }
 
-		  if (temperature >= 80){
-
+		  if (expFlag == 1 && temperature <= 30){
+			  HAL_GPIO_WritePin(GPIOB, GPIO_PIN_8, GPIO_PIN_SET);
+		  }
+		  else if(temperature >=80){
+			  HAL_GPIO_WritePin(GPIOB, GPIO_PIN_8, GPIO_PIN_RESET);
 		  }
 	  }
     /* USER CODE END WHILE */
@@ -455,10 +463,16 @@ static void MX_GPIO_Init(void)
   __HAL_RCC_GPIOB_CLK_ENABLE();
 
   /*Configure GPIO pin Output Level */
-  HAL_GPIO_WritePin(GPIOC, SPI2_CS_Pin|CG_Pin, GPIO_PIN_RESET);
+  HAL_GPIO_WritePin(SPI2_CS_GPIO_Port, SPI2_CS_Pin, GPIO_PIN_RESET);
+
+  /*Configure GPIO pin Output Level */
+  HAL_GPIO_WritePin(CG_GPIO_Port, CG_Pin, GPIO_PIN_SET);
 
   /*Configure GPIO pin Output Level */
   HAL_GPIO_WritePin(GPIOA, LD2_Pin|GPIO_PIN_8, GPIO_PIN_RESET);
+
+  /*Configure GPIO pin Output Level */
+  HAL_GPIO_WritePin(GPIOB, GPIO_PIN_8, GPIO_PIN_RESET);
 
   /*Configure GPIO pin : B1_Pin */
   GPIO_InitStruct.Pin = B1_Pin;
@@ -486,6 +500,13 @@ static void MX_GPIO_Init(void)
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
   HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
+
+  /*Configure GPIO pin : PB8 */
+  GPIO_InitStruct.Pin = GPIO_PIN_8;
+  GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
+  GPIO_InitStruct.Pull = GPIO_NOPULL;
+  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_VERY_HIGH;
+  HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);
 
 /* USER CODE BEGIN MX_GPIO_Init_2 */
 /* USER CODE END MX_GPIO_Init_2 */
@@ -517,6 +538,20 @@ void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart) {
 		sscanf((char *)load_buf, "%f", &load);
 		HAL_UART_Receive_IT(&huart3, load_buf, 6); // 6바이?�� ?��?��
 	}
+
+	if (huart->Instance == USART2) {
+			switch (sign){
+				case 'A':
+					expFlag = 1;
+					//printf("AA");
+					break;
+				case'B':
+					expFlag = 0;
+					HAL_GPIO_WritePin(GPIOA, LD2_Pin|GPIO_PIN_8, GPIO_PIN_RESET);
+					break;
+			}
+			HAL_UART_Receive_IT(&huart2, &sign, 1);
+		}
 }
 
 int GetMatchingLength(float filteredValue) {
@@ -621,7 +656,7 @@ int GetMatchingLength(float filteredValue) {
     else if (filteredValue > 41705.48286 && filteredValue <= 41821.65321) return 208;
     else if (filteredValue > 41821.65321 && filteredValue <= 41937.82355) return 209;
     else if (filteredValue > 41937.82355) return 210;
-    return 0; // 매칭?���?????? ?��?��
+    return 0; // 매칭?���?????????? ?��?��
 }
 
 
