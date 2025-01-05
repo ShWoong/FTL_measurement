@@ -63,7 +63,7 @@ volatile uint8_t expFlag = 0;
 volatile uint8_t actFlag = 0;
 uint32_t count = 0;
 double temperature = 0.0;
-uint16_t length = 0; //Length of stretch sensor
+float length = 0; //Length of stretch sensor
 uint8_t load_buf[20];
 float load;
 uint8_t sign;
@@ -82,7 +82,7 @@ static void MX_SPI2_Init(void);
 static void MX_TIM4_Init(void);
 static void MX_USART3_UART_Init(void);
 /* USER CODE BEGIN PFP */
-int GetMatchingLength(float filteredValue);
+float GetMatchingLength(float filteredValue);
 int _write(int file, char* p, int len){
 	HAL_UART_Transmit(&huart2, p, len, 1);
 	return len;
@@ -159,7 +159,7 @@ int main(void)
 		  printf(",");
 		  printf("%.2f", load);
 		  printf(",");
-		  printf("%" PRIu16 "\r\n", length);
+		  printf("%.2f\r\n", length);
 		  count = 0;
 		  TIM2->CNT = 0;
 		  TIM2->CCR1 = 0;
@@ -536,7 +536,7 @@ void HAL_SPI_RxCpltCallback(SPI_HandleTypeDef *hspi) {
 void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart) {
 	if (huart->Instance == USART3) {
 		sscanf((char *)load_buf, "%f", &load);
-		HAL_UART_Receive_IT(&huart3, load_buf, 6); // 6바이?�� ?��?��
+		HAL_UART_Receive_IT(&huart3, load_buf, 7);
 	}
 
 	if (huart->Instance == USART2) {
@@ -545,7 +545,7 @@ void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart) {
 					expFlag = 1;
 					//printf("AA");
 					break;
-				case'B':
+				case 'B':
 					expFlag = 0;
 					HAL_GPIO_WritePin(GPIOA, LD2_Pin|GPIO_PIN_8, GPIO_PIN_RESET);
 					break;
@@ -554,109 +554,10 @@ void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart) {
 		}
 }
 
-int GetMatchingLength(float filteredValue) {
-    if (filteredValue <= 29700.67472) return 110;
-    else if (filteredValue > 29700.67472 && filteredValue <= 29831.26761) return 111;
-    else if (filteredValue > 29831.26761 && filteredValue <= 29961.86051) return 112;
-    else if (filteredValue > 29961.86051 && filteredValue <= 30092.4534) return 113;
-    else if (filteredValue > 30092.4534 && filteredValue <= 30223.0463) return 114;
-    else if (filteredValue > 30223.0463 && filteredValue <= 30356.7076) return 115;
-    else if (filteredValue > 30356.7076 && filteredValue <= 30493.4373) return 116;
-    else if (filteredValue > 30493.4373 && filteredValue <= 30630.16701) return 117;
-    else if (filteredValue > 30630.16701 && filteredValue <= 30766.89671) return 118;
-    else if (filteredValue > 30766.89671 && filteredValue <= 30903.62641) return 119;
-    else if (filteredValue > 30903.62641 && filteredValue <= 31041.67236) return 120;
-    else if (filteredValue > 31041.67236 && filteredValue <= 31181.03454) return 121;
-    else if (filteredValue > 31181.03454 && filteredValue <= 31320.39672) return 122;
-    else if (filteredValue > 31320.39672 && filteredValue <= 31459.75891) return 123;
-    else if (filteredValue > 31459.75891 && filteredValue <= 31599.12109) return 124;
-    else if (filteredValue > 31599.12109 && filteredValue <= 31734.76618) return 125;
-    else if (filteredValue > 31734.76618 && filteredValue <= 31866.69417) return 126;
-    else if (filteredValue > 31866.69417 && filteredValue <= 31998.62217) return 127;
-    else if (filteredValue > 31998.62217 && filteredValue <= 32130.55017) return 128;
-    else if (filteredValue > 32130.55017 && filteredValue <= 32262.47816) return 129;
-    else if (filteredValue > 32262.47816 && filteredValue <= 32396.46047) return 130;
-    else if (filteredValue > 32396.46047 && filteredValue <= 32532.49709) return 131;
-    else if (filteredValue > 32532.49709 && filteredValue <= 32668.53371) return 132;
-    else if (filteredValue > 32668.53371 && filteredValue <= 32804.57033) return 133;
-    else if (filteredValue > 32804.57033 && filteredValue <= 32940.60695) return 134;
-    else if (filteredValue > 32940.60695 && filteredValue <= 33074.44884) return 135;
-    else if (filteredValue > 33074.44884 && filteredValue <= 33206.09599) return 136;
-    else if (filteredValue > 33206.09599 && filteredValue <= 33337.74315) return 137;
-    else if (filteredValue > 33337.74315 && filteredValue <= 33469.3903) return 138;
-    else if (filteredValue > 33469.3903 && filteredValue <= 33601.03746) return 139;
-    else if (filteredValue > 33601.03746 && filteredValue <= 33728.28677) return 140;
-    else if (filteredValue > 33728.28677 && filteredValue <= 33851.13824) return 141;
-    else if (filteredValue > 33851.13824 && filteredValue <= 33973.9897) return 142;
-    else if (filteredValue > 33973.9897 && filteredValue <= 34096.84117) return 143;
-    else if (filteredValue > 34096.84117 && filteredValue <= 34219.69264) return 144;
-    else if (filteredValue > 34219.69264 && filteredValue <= 34339.75432) return 145;
-    else if (filteredValue > 34339.75432 && filteredValue <= 34457.0262) return 146;
-    else if (filteredValue > 34457.0262 && filteredValue <= 34574.29809) return 147;
-    else if (filteredValue > 34574.29809 && filteredValue <= 34691.56997) return 148;
-    else if (filteredValue > 34691.56997 && filteredValue <= 34808.84185) return 149;
-    else if (filteredValue > 34808.84185 && filteredValue <= 34931.2963) return 150;
-    else if (filteredValue > 34931.2963 && filteredValue <= 35058.93329) return 151;
-    else if (filteredValue > 35058.93329 && filteredValue <= 35186.57029) return 152;
-    else if (filteredValue > 35186.57029 && filteredValue <= 35314.20729) return 153;
-    else if (filteredValue > 35314.20729 && filteredValue <= 35441.84429) return 154;
-    else if (filteredValue > 35441.84429 && filteredValue <= 35564.20613) return 155;
-    else if (filteredValue > 35564.20613 && filteredValue <= 35681.29283) return 156;
-    else if (filteredValue > 35681.29283 && filteredValue <= 35798.37953) return 157;
-    else if (filteredValue > 35798.37953 && filteredValue <= 35915.46623) return 158;
-    else if (filteredValue > 35915.46623 && filteredValue <= 36032.55292) return 159;
-    else if (filteredValue > 36032.55292 && filteredValue <= 36152.67354) return 160;
-    else if (filteredValue > 36152.67354 && filteredValue <= 36275.82808) return 161;
-    else if (filteredValue > 36275.82808 && filteredValue <= 36398.98263) return 162;
-    else if (filteredValue > 36398.98263 && filteredValue <= 36522.13717) return 163;
-    else if (filteredValue > 36522.13717 && filteredValue <= 36645.29171) return 164;
-    else if (filteredValue > 36645.29171 && filteredValue <= 36768.16159) return 165;
-    else if (filteredValue > 36768.16159 && filteredValue <= 36890.74682) return 166;
-    else if (filteredValue > 36890.74682 && filteredValue <= 37013.33204) return 167;
-    else if (filteredValue > 37013.33204 && filteredValue <= 37135.91727) return 168;
-    else if (filteredValue > 37135.91727 && filteredValue <= 37258.50249) return 169;
-    else if (filteredValue > 37258.50249 && filteredValue <= 37378.18739) return 170;
-    else if (filteredValue > 37378.18739 && filteredValue <= 37494.97195) return 171;
-    else if (filteredValue > 37494.97195 && filteredValue <= 37611.75651) return 172;
-    else if (filteredValue > 37611.75651 && filteredValue <= 37728.54107) return 173;
-    else if (filteredValue > 37728.54107 && filteredValue <= 37845.32563) return 174;
-    else if (filteredValue > 37845.32563 && filteredValue <= 37961.7628) return 175;
-    else if (filteredValue > 37961.7628 && filteredValue <= 38077.85259) return 176;
-    else if (filteredValue > 38077.85259 && filteredValue <= 38193.94238) return 177;
-    else if (filteredValue > 38193.94238 && filteredValue <= 38310.03218) return 178;
-    else if (filteredValue > 38310.03218 && filteredValue <= 38426.12197) return 179;
-    else if (filteredValue > 38426.12197 && filteredValue <= 38541.81482) return 180;
-    else if (filteredValue > 38541.81482 && filteredValue <= 38657.11075) return 181;
-    else if (filteredValue > 38657.11075 && filteredValue <= 38772.40668) return 182;
-    else if (filteredValue > 38772.40668 && filteredValue <= 38887.7026) return 183;
-    else if (filteredValue > 38887.7026 && filteredValue <= 39002.99853) return 184;
-    else if (filteredValue > 39002.99853 && filteredValue <= 39121.24609) return 185;
-    else if (filteredValue > 39121.24609 && filteredValue <= 39242.4453) return 186;
-    else if (filteredValue > 39242.4453 && filteredValue <= 39363.6445) return 187;
-    else if (filteredValue > 39363.6445 && filteredValue <= 39484.8437) return 188;
-    else if (filteredValue > 39484.8437 && filteredValue <= 39606.0429) return 189;
-    else if (filteredValue > 39606.0429 && filteredValue <= 39726.05644) return 190;
-    else if (filteredValue > 39726.05644 && filteredValue <= 39844.88432) return 191;
-    else if (filteredValue > 39844.88432 && filteredValue <= 39963.71221) return 192;
-    else if (filteredValue > 39963.71221 && filteredValue <= 40082.54009) return 193;
-    else if (filteredValue > 40082.54009 && filteredValue <= 40201.36798) return 194;
-    else if (filteredValue > 40201.36798 && filteredValue <= 40318.46586) return 195;
-    else if (filteredValue > 40318.46586 && filteredValue <= 40433.83375) return 196;
-    else if (filteredValue > 40433.83375 && filteredValue <= 40549.20163) return 197;
-    else if (filteredValue > 40549.20163 && filteredValue <= 40664.56952) return 198;
-    else if (filteredValue > 40664.56952 && filteredValue <= 40779.93741) return 199;
-    else if (filteredValue > 40779.93741 && filteredValue <= 40895.36491) return 200;
-    else if (filteredValue > 40895.36491 && filteredValue <= 41010.85204) return 201;
-    else if (filteredValue > 41010.85204 && filteredValue <= 41126.33917) return 202;
-    else if (filteredValue > 41126.33917 && filteredValue <= 41241.8263) return 203;
-    else if (filteredValue > 41241.8263 && filteredValue <= 41357.31343) return 204;
-    else if (filteredValue > 41357.31343 && filteredValue <= 41473.14217) return 205;
-    else if (filteredValue > 41473.14217 && filteredValue <= 41589.31251) return 206;
-    else if (filteredValue > 41589.31251 && filteredValue <= 41705.48286) return 207;
-    else if (filteredValue > 41705.48286 && filteredValue <= 41821.65321) return 208;
-    else if (filteredValue > 41821.65321 && filteredValue <= 41937.82355) return 209;
-    else if (filteredValue > 41937.82355) return 210;
-    return 0; // 매칭?���?????????? ?��?��
+float GetMatchingLength(float filteredValue) {
+
+	float result = 8.0450 * 1e-3 * filteredValue - 229.47;
+	return result;
 }
 
 
