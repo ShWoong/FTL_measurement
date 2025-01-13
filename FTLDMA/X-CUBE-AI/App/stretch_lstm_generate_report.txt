@@ -1,0 +1,123 @@
+ST Edge AI Core v1.0.0-19894
+Created date          : 2025-01-09 01:48:46
+Parameters            : generate --target stm32f4 --name stretch_lstm -m C:/Users/Seo/Desktop/Stretch_tanh.keras --compression none --verbosity 1 --allocate-inputs --allocate-outputs --workspace C:/Users/Seo/AppData/Local/Temp/mxAI_workspace3100503220820011689245261948298132 --output C:/Users/Seo/.stm32cubemx/stretch_lstm_output
+
+Exec/report summary (generate)
+----------------------------------------------------------------------------------------------------------
+model file         :   C:\Users\Seo\Desktop\Stretch_tanh.keras                                            
+type               :   keras                                                                              
+c_name             :   stretch_lstm                                                                       
+compression        :   none                                                                               
+options            :   allocate-inputs, allocate-outputs                                                  
+optimization       :   balanced                                                                           
+target/series      :   stm32f4                                                                            
+workspace dir      :   C:\Users\Seo\AppData\Local\Temp\mxAI_workspace3100503220820011689245261948298132   
+output dir         :   C:\Users\Seo\.stm32cubemx\stretch_lstm_output                                      
+model_fmt          :   float                                                                              
+model_name         :   Stretch_tanh                                                                       
+model_hash         :   0x1a8c17d8332cac873dadbb57009d9ca4                                                 
+params #           :   1,169 items (4.57 KiB)                                                             
+----------------------------------------------------------------------------------------------------------
+input 1/1          :   'input_0', f32(1x1x1), 4 Bytes, activations                                        
+output 1/1         :   'dense', f32(1x1), 4 Bytes, activations                                            
+macc               :   1,185                                                                              
+weights (ro)       :   4,868 B (4.75 KiB) (1 segment) / +192(+4.1%) vs float model                        
+activations (rw)   :   516 B (516 B) (1 segment) *                                                        
+ram (total)        :   516 B (516 B) = 516 + 0 + 0                                                        
+----------------------------------------------------------------------------------------------------------
+(*) 'input'/'output' buffers can be used from the activations buffer
+
+Model name - Stretch_tanh
+------ ----------------------- --------------- ------------- ------- -------------- --- ----------------- ----------------- -------------- 
+m_id   layer (type,original)   oshape          param/size       macc   connected to   | c_size            c_macc            c_type         
+------ ----------------------- --------------- ------------- ------- -------------- --- ----------------- ----------------- -------------- 
+0      input_0 (Input, None)   [b:1,h:1,c:1]                                          | +4,800(+100.0%)   +1,168(+100.0%)   LSTM_[0]       
+       lstm (LSTM, LSTM)       [b:1,c:16]      1,152/4,608     1,168        input_0   | -4,608(-100.0%)   -1,168(-100.0%)   
+------ ----------------------- --------------- ------------- ------- -------------- --- ----------------- ----------------- -------------- 
+1      dense (Dense, Dense)    [b:1,c:1]       17/68              17           lstm   |                                     Dense_[o][1]   
+------ ----------------------- --------------- ------------- ------- -------------- --- ----------------- ----------------- -------------- 
+model/c-model: macc=1,185/1,185  weights=4,676/4,868 +192(+4.1%) activations=--/516 io=--/0
+
+
+
+Generated C-graph summary
+------------------------------------------------------------------------------------------------------------------------
+model name            : Stretch_tanh
+c-name                : stretch_lstm
+c-node #              : 2
+c-array #             : 10
+activations size      : 516 (1 segment)
+weights size          : 4868 (1 segment)
+macc                  : 1185
+inputs                : ['input_0_output']
+outputs               : ['dense_output']
+
+C-Arrays (10)
+------ ---------------- ----------- ------------------------- ------------- --------- 
+c_id   name (*_array)   item/size   domain/mem-pool           c-type        comment   
+------ ---------------- ----------- ------------------------- ------------- --------- 
+0      dense_bias       1/4         weights/weights           const float             
+1      dense_output     1/4         activations/**default**   float         /output   
+2      dense_weights    16/64       weights/weights           const float             
+3      input_0_output   1/4         activations/**default**   float         /input    
+4      lstm_bias        64/256      weights/weights           const float             
+5      lstm_kernel      64/256      weights/weights           const float             
+6      lstm_output0     16/64       activations/**default**   float                   
+7      lstm_peephole    48/192      weights/weights           const float             
+8      lstm_recurrent   1024/4096   weights/weights           const float             
+9      lstm_scratch0    112/448     activations/**default**   float                   
+------ ---------------- ----------- ------------------------- ------------- --------- 
+
+C-Layers (2)
+------ ---------------- ---- ------------ ------ ------ ------------------- ------------------- 
+c_id   name (*_layer)   id   layer_type   macc   rom    tensors             shape (array id)    
+------ ---------------- ---- ------------ ------ ------ ------------------- ------------------- 
+0      lstm             0    LSTM         1168   4800   I: input_0_output   f32(1x1x1) (3)      
+                                                        S: lstm_scratch0                        
+                                                        W: lstm_kernel      f32(64x1) (5)       
+                                                        W: lstm_recurrent   f32(64x16) (8)      
+                                                        W: lstm_peephole    f32(48x1x1x1) (7)   
+                                                        W: lstm_bias        f32(64) (4)         
+                                                        O: lstm_output0     f32(1x16) (6)       
+------ ---------------- ---- ------------ ------ ------ ------------------- ------------------- 
+1      dense            1    Dense        17     68     I: lstm_output0     f32(1x16) (6)       
+                                                        W: dense_weights    f32(1x16) (2)       
+                                                        W: dense_bias       f32(1) (0)          
+                                                        O: dense_output     f32(1x1) (1)        
+------ ---------------- ---- ------------ ------ ------ ------------------- ------------------- 
+
+
+
+Number of operations per c-layer
+------- ------ --------------- ------- -------------- 
+c_id    m_id   name (type)         #op           type 
+------- ------ --------------- ------- -------------- 
+0       0      lstm (LSTM)       1,168   smul_f32_f32 
+1       1      dense (Dense)        17   smul_f32_f32 
+------- ------ --------------- ------- -------------- 
+total                            1,185 
+
+Number of operation types
+---------------- ------- ----------- 
+operation type         #           % 
+---------------- ------- ----------- 
+smul_f32_f32       1,185      100.0% 
+
+Complexity report (model)
+------ --------- ------------------------- ------------------------- ------ 
+m_id   name      c_macc                    c_rom                     c_id   
+------ --------- ------------------------- ------------------------- ------ 
+0      input_0   ||||||||||||||||  98.6%   ||||||||||||||||  98.6%   [0]    
+1      dense     |                  1.4%   |                  1.4%   [1]    
+------ --------- ------------------------- ------------------------- ------ 
+macc=1,185 weights=4,868 act=516 ram_io=0
+
+Generated files (7)
+-------------------------------------------------------------------------- 
+C:\Users\Seo\.stm32cubemx\stretch_lstm_output\stretch_lstm_data_params.h   
+C:\Users\Seo\.stm32cubemx\stretch_lstm_output\stretch_lstm_data_params.c   
+C:\Users\Seo\.stm32cubemx\stretch_lstm_output\stretch_lstm_data.h          
+C:\Users\Seo\.stm32cubemx\stretch_lstm_output\stretch_lstm_data.c          
+C:\Users\Seo\.stm32cubemx\stretch_lstm_output\stretch_lstm_config.h        
+C:\Users\Seo\.stm32cubemx\stretch_lstm_output\stretch_lstm.h               
+C:\Users\Seo\.stm32cubemx\stretch_lstm_output\stretch_lstm.c               

@@ -556,7 +556,10 @@ void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart) {
 
 float GetMatchingLength(float filteredValue) {
 
-	float result = 8.0450 * 1e-3 * filteredValue - 229.47;
+	float result = 0.0083815 * filteredValue - 225.34;
+	if(result<0){
+		result = 0;
+	}
 	return result;
 }
 

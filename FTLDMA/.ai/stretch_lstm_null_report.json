@@ -1,0 +1,135 @@
+{
+    "_allocate_inputs": 4,
+    "_allocate_outputs": 4,
+    "cli_parameters": "generate --target stm32f4 --name stretch_lstm -m C:/Users/Seo/Desktop/Stretch_tanh.keras --compression none --verbosity 1 --allocate-inputs --allocate-outputs --workspace C:/Users/Seo/AppData/Local/Temp/mxAI_workspace1979157088230014547831169856416300 --output C:/Users/Seo/.stm32cubemx/stretch_lstm_output",
+    "cli_version": {
+        "extra": "19894",
+        "major": 1,
+        "micro": 0,
+        "minor": 0
+    },
+    "cli_version_str": "1.0.0-19894",
+    "code_size": 0,
+    "compression": [],
+    "date_time": "2025-01-08T22:41:53+0900",
+    "error": 0,
+    "error_str": [],
+    "exec_cmd": "generate",
+    "exec_duration": 0.0,
+    "hash": "0x1a8c17d8332cac873dadbb57009d9ca4",
+    "inputs": [
+        "input_0"
+    ],
+    "layers": [
+        {
+            "c_id": [
+                0
+            ],
+            "extras": {
+                "n_macc": 0,
+                "n_params": 0,
+                "psize": 0,
+                "rom_output": {
+                    "c_size": 4,
+                    "fmt": {
+                        "format": "float"
+                    },
+                    "shape": [
+                        1,
+                        1
+                    ]
+                },
+                "rom_size": 4800
+            },
+            "id": 0,
+            "inputs": [],
+            "name": "input_0",
+            "original": null,
+            "type": "Input"
+        },
+        {
+            "c_id": [],
+            "extras": {
+                "n_macc": 1168,
+                "n_params": 1152,
+                "psize": 4608,
+                "rom_size": 0
+            },
+            "id": 0,
+            "inputs": [
+                "input_0"
+            ],
+            "name": "lstm",
+            "original": "LSTM",
+            "type": "LSTM"
+        },
+        {
+            "c_id": [
+                1
+            ],
+            "extras": {
+                "n_macc": 17,
+                "n_params": 17,
+                "psize": 68,
+                "rom_output": {
+                    "c_size": 4,
+                    "fmt": {
+                        "format": "float"
+                    },
+                    "shape": [
+                        1
+                    ]
+                },
+                "rom_size": 68
+            },
+            "id": 1,
+            "inputs": [
+                "lstm"
+            ],
+            "name": "dense",
+            "original": "Dense",
+            "type": "Dense"
+        }
+    ],
+    "model_files": [
+        "C:\\Users\\Seo\\Desktop\\Stretch_tanh.keras"
+    ],
+    "model_n_params": 1169,
+    "model_name": "Stretch_tanh",
+    "model_size": 4676,
+    "model_type": "keras",
+    "name": "stretch_lstm",
+    "outputs": [
+        "dense"
+    ],
+    "ram_io_size": [
+        0,
+        0
+    ],
+    "ram_size": 516,
+    "report_version": 1.1,
+    "rom_cfact": 1.0,
+    "rom_heap_inspector": 2048,
+    "rom_inputs": [
+        {
+            "c_size": 4,
+            "c_type": "float",
+            "name": "input_0"
+        }
+    ],
+    "rom_n_macc": 1185,
+    "rom_outputs": [
+        {
+            "c_size": 4,
+            "c_type": "float",
+            "name": "dense"
+        }
+    ],
+    "rom_size": 4868,
+    "strategy": "",
+    "tools_api_version": "1.0.0-19894",
+    "tools_version": "1.0.0-19894",
+    "val_error": -1.0,
+    "val_error_desc": "None (None) #-1",
+    "val_metrics": []
+}
