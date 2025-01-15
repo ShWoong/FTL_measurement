@@ -151,13 +151,14 @@ int main(void)
 
 	  if (tim4Flag == 1 && spi2Flag == 0){
 		  tim4Flag = 0;
-		  float filtered2 = IntegralFilter(count, &prev_output, alpha);
-		  float filtered = BWLPF(filtered, 4);
-		  length = GetMatchingLength(filtered2);
+		  float filtered_IF = IntegralFilter(count, &prev_output, alpha);
+		  float filtered_BW = BWLPF(filtered_IF, 4);
+		  length = GetMatchingLength(filtered_BW);
 
-		  printf("%.2f", temperature);
-		  printf(",");
-		  printf("%.2f", load);
+		  //printf("%.2f", temperature);
+		  //printf(",");
+		  //printf("%.2f", load);
+		  printf("%.2f", filtered_BW);
 		  printf(",");
 		  printf("%.2f\r\n", length);
 		  count = 0;
@@ -353,7 +354,7 @@ static void MX_TIM4_Init(void)
 
   /* USER CODE END TIM4_Init 1 */
   htim4.Instance = TIM4;
-  htim4.Init.Prescaler = 4;
+  htim4.Init.Prescaler = 14;
   htim4.Init.CounterMode = TIM_COUNTERMODE_UP;
   htim4.Init.Period = 59999;
   htim4.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
@@ -556,10 +557,10 @@ void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart) {
 
 float GetMatchingLength(float filteredValue) {
 
-	float result = 0.0083815 * filteredValue - 225.34;
-	if(result<0){
+	float result = 0.0083815 * filteredValue - 200.34;
+	/*if(result<0){
 		result = 0;
-	}
+	}*/
 	return result;
 }
 
