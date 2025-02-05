@@ -4,6 +4,7 @@ extern SPI_HandleTypeDef hspi2;
 bool initialized = false;
 uint8_t faultMask = MAX31855_FAULT_ALL;
 uint8_t buf[4];
+double centigrade;
 
 
 /**************************************************************************/
@@ -66,7 +67,7 @@ double readCelsius(void) {
 
   if (v & faultMask) {
     // uh oh, a serious problem!
-    return NAN;
+    return centigrade;
   }
 
   if (v & 0x80000000) {
@@ -78,7 +79,7 @@ double readCelsius(void) {
   }
   // Serial.println(v, HEX);
 
-  double centigrade = v;
+  centigrade = v;
 
   // LSB = 0.25 degrees C
   centigrade *= 0.25;
