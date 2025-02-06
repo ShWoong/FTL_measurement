@@ -12,70 +12,45 @@
 
 /*INITIALIZING*/
 /*ADC1(EMG)*/
-float hpf_x_buffer10[SECTIONS][2] = {0};
-float hpf_x_buffer11[SECTIONS][2] = {0};
-float hpf_x_buffer12[SECTIONS][2] = {0};
-float hpf_x_buffer13[SECTIONS][2] = {0};
-float hpf_y_buffer10[SECTIONS][2] = {0};
-float hpf_y_buffer11[SECTIONS][2] = {0};
-float hpf_y_buffer12[SECTIONS][2] = {0};
-float hpf_y_buffer13[SECTIONS][2] = {0};
+float hpf_x_buffer1[SECTIONS][2] = {0};
+float hpf_y_buffer1[SECTIONS][2] = {0};
 
-/*ADC2(STRETCH)*/
 float hpf_x_buffer20[SECTIONS][2] = {0};
-float hpf_x_buffer21[SECTIONS][2] = {0};
-float hpf_x_buffer22[SECTIONS][2] = {0};
-float hpf_x_buffer23[SECTIONS][2] = {0};
 float hpf_y_buffer20[SECTIONS][2] = {0};
-float hpf_y_buffer21[SECTIONS][2] = {0};
-float hpf_y_buffer22[SECTIONS][2] = {0};
-float hpf_y_buffer23[SECTIONS][2] = {0};
+
+
 
 /*FILTER COEFFICIENTS*/
+float hpf_sos_40[SECTIONS][6] = {
+    {8.3720e-01, -1.6744e+00, 8.3720e-01, 1.0000e+00, -1.6475e+00, 7.0090e-01},
+};//40Hz
+float hpf_sos_35[SECTIONS][6] = {
+    {9.82385e-01, -1.96477e+00, 9.82385e-01, 1.00000e+00, -1.96451e+00, 9.65090e-01},
+};//35Hz
 float hpf_sos_20[SECTIONS][6] = {
-	{0.8484753, -1.69695059, 0.8484753, 1.0, -1.77831349, 0.79244747},
-	{1.0, -2.0, 1.0, 1.0, -1.8934156, 0.90846441} //20Hz
-};
-float hpf_sos_30[SECTIONS][6] = {
-	{0.78136727, -1.56273453,  0.78136727, 1.0, -1.67466095, 0.70485868},
-	{1.0, -2.0,  1.0, 1.0, -1.83312526, 0.86618045}
-};
-float hpf_sos_50[SECTIONS][6] = {
-	{0.8484753, -1.69695059,  0.8686753, 1.0, -1.77831349, 0.79244747},
-	{1.0, -2.0,  1.0, 1.0, -1.8934156, 0.90846441}
-};
+    {9.3910e-01, -1.8782e+00, 9.3910e-01, 1.0000e+00, -1.8783e+00, 8.8100e-01},
+};//20Hz
+float hpf_sos_1[SECTIONS][6] = {
+    {9.98404e-01, -1.99681e+00, 9.98404e-01, 1.00000e+00, -1.99679e+00, 9.96810e-01},
+};//1Hz
 
-float BWHPF(float input, int8_t ch) {
+
+float EMGBWHPF(float input) {
 	float output = 0;
 	float xn = 0;
 
-	if (ch == 10){
 
-		for (int i = 0; i < SECTIONS; i++) {
-			xn = (i == 0) ? input : output;
+	for (int i = 0; i < SECTIONS; i++) {
+		xn = (i == 0) ? input : output;
 
-			output = hpf_sos_20[i][0] * xn + hpf_sos_20[i][1] * hpf_x_buffer10[i][0] + hpf_sos_20[i][2] * hpf_x_buffer10[i][1]
-		    - hpf_sos_20[i][4] * hpf_y_buffer10[i][0] - hpf_sos_20[i][5] * hpf_y_buffer10[i][1];
+		output = hpf_sos_20[i][0] * xn + hpf_sos_20[i][1] * hpf_x_buffer20[i][0] + hpf_sos_20[i][2] * hpf_x_buffer20[i][1]
+		- hpf_sos_20[i][4] * hpf_y_buffer20[i][0] - hpf_sos_20[i][5] * hpf_y_buffer20[i][1];
 
-			hpf_x_buffer10[i][1] = hpf_x_buffer10[i][0];
-			hpf_x_buffer10[i][0] = xn;
-			hpf_y_buffer10[i][1] = hpf_y_buffer10[i][0];
-			hpf_y_buffer10[i][0] = output;
-		}
-	}
-	else if (ch == 20){
+		hpf_x_buffer20[i][1] = hpf_x_buffer20[i][0];
+		hpf_x_buffer20[i][0] = xn;
+		hpf_y_buffer20[i][1] = hpf_y_buffer20[i][0];
+		hpf_y_buffer20[i][0] = output;
 
-		for (int i = 0; i < SECTIONS; i++) {
-			xn = (i == 0) ? input : output;
-
-			output = hpf_sos_50[i][0] * xn + hpf_sos_50[i][1] * hpf_x_buffer20[i][0] + hpf_sos_50[i][2] * hpf_x_buffer20[i][1]
-		    - hpf_sos_50[i][4] * hpf_y_buffer20[i][0] - hpf_sos_50[i][5] * hpf_y_buffer20[i][1];
-
-			hpf_x_buffer20[i][1] = hpf_x_buffer20[i][0];
-			hpf_x_buffer20[i][0] = xn;
-			hpf_y_buffer20[i][1] = hpf_y_buffer20[i][0];
-			hpf_y_buffer20[i][0] = output;
-		}
 	}
 	return output;
 }
@@ -98,28 +73,14 @@ float IntegralFilter(float input, float *prev_output, float alpha) {
 /*INITILAIZING*/
 /*ADC1(EMG)*/
 float lpf_x_buffer10[SECTIONS][2] = {0};
-float lpf_x_buffer11[SECTIONS][2] = {0};
-float lpf_x_buffer12[SECTIONS][2] = {0};
-float lpf_x_buffer13[SECTIONS][2] = {0};
 float lpf_y_buffer10[SECTIONS][2] = {0};
-float lpf_y_buffer11[SECTIONS][2] = {0};
-float lpf_y_buffer12[SECTIONS][2] = {0};
-float lpf_y_buffer13[SECTIONS][2] = {0};
 /*ADC2(STRETCH)*/
-float lpf_x_buffer20[SECTIONS][2] = {0};
-float lpf_x_buffer21[SECTIONS][2] = {0};
-float lpf_x_buffer22[SECTIONS][2] = {0};
-float lpf_x_buffer23[SECTIONS][2] = {0};
-float lpf_x_buffer30[SECTIONS][2] = {0};
-float lpf_y_buffer20[SECTIONS][2] = {0};
-float lpf_y_buffer21[SECTIONS][2] = {0};
-float lpf_y_buffer22[SECTIONS][2] = {0};
-float lpf_y_buffer23[SECTIONS][2] = {0};
-float lpf_y_buffer30[SECTIONS][2] = {0};
+float lpf_x_buffer200[SECTIONS][2] = {0};
+float lpf_y_buffer200[SECTIONS][2] = {0};
 
-float lpf_sos_1[SECTIONS][6] = {
-		{8.76555488e-05, 1.75311098e-04, 8.76555488e-05, 1.00000000e+00, -1.97334425e+00, 9.73694872e-01},
-		}; // 1.5 Hz
+float lpf_x_buffer14[SECTIONS][2] = {0};
+float lpf_y_buffer14[SECTIONS][2] = {0};
+
 
 float lpf_sos_2[SECTIONS][6] = {
 		{1.55148423e-04, 3.10296847e-04, 1.55148423e-04, 1.00000000e+00, -1.96446058e+00, 9.65081174e-01},
@@ -132,97 +93,66 @@ float lpf_sos_3[SECTIONS][6] = {
 float lpf_sos_4[SECTIONS][6] = {
     {6.09854719e-04, 1.21970944e-03, 6.09854719e-04, 1.00000000e+00, -1.92894226e+00, 9.31381682e-01},
 }; // 4 Hz
+float lpf_sos_14[SECTIONS][6] = {
+    {2.50000e-01, 5.00000e-01, 2.50000e-01, 1.00000e+00, -1.75100e+00, 7.80000e-01},
+};//14Hz
+float lpf_sos_53[SECTIONS][6] = {
+    {4.8240e-03, 9.6480e-03, 4.8240e-03, 1.0000e+00, -1.7990e+00, 8.1800e-01},
+};//53Hz
+float lpf_sos_200[SECTIONS][6] = {
+    {6.7500e-02, 1.3490e-01, 6.7500e-02, 1.0000e+00, -1.1429e+00, 4.1280e-01},
+};//200Hz
 
-float lpf_sos_5[SECTIONS][6] = {
-	{0.00324804, 0.00649608, 0.00324804, 1.0, -1.85628891, 0.87039432},
-	{1.0, 2.0, 1.0, 1.0, -1.96920477, 0.97469157}
-};
-float lpf_sos_6[SECTIONS][6] = {
-	{0.00468257, 0.00936514, 0.00468257, 1.0, -1.82490773, 0.84708173},
-	{1.0, 2.0, 1.0, 1.0, -1.95916512, 0.96483797}
-};
-float lpf_sos_10[SECTIONS][6] = {
-    {8.98486146e-07, 1.79697229e-06, 8.98486146e-07, 1.0, -1.88660958, 0.890339736},
-	{1.0, 2.0, 1.0, 1.0, -1.94921596, 0.953069895} //10Hz
-};
-float lpf_sos_20[SECTIONS][6] = {
-    {1.32937289e-05, 2.65874578e-05, 1.32937289e-05, 1.0, -1.77831349, 0.79244747},
-	{1.00000000, 2.00000000, 1.00000000, 1.00000000, -1.89341560, 0.90846441} //20Hz
-};
 
-float BWLPF(float input, int8_t ch) {
+float BWLPF(float input, int8_t cf) {
 	float output = 0;
 	float xn = 0;
 
-	if (ch == 10){
+	if (cf == 4){
 
 		for (int i = 0; i < SECTIONS; i++) {
 			xn = (i == 0) ? input : output;
 
-			output = lpf_sos_10[i][0] * xn + lpf_sos_10[i][1] * lpf_x_buffer10[i][0] + lpf_sos_10[i][2] * lpf_x_buffer10[i][1]
-			- lpf_sos_10[i][4] * lpf_y_buffer10[i][0] - lpf_sos_10[i][5] * lpf_y_buffer10[i][1];
+			output = lpf_sos_4[i][0] * xn + lpf_sos_4[i][1] * lpf_x_buffer10[i][0] + lpf_sos_4[i][2] * lpf_x_buffer10[i][1]
+			- lpf_sos_4[i][4] * lpf_y_buffer10[i][0] - lpf_sos_4[i][5] * lpf_y_buffer10[i][1];
 
 			lpf_x_buffer10[i][1] = lpf_x_buffer10[i][0];
 			lpf_x_buffer10[i][0] = xn;
 			lpf_y_buffer10[i][1] = lpf_y_buffer10[i][0];
 			lpf_y_buffer10[i][0] = output;
-		    }
-	}
-	else if (ch == 20){
-
-		for (int i = 0; i < SECTIONS; i++) {
-			xn = (i == 0) ? input : output;
-
-			output = lpf_sos_20[i][0] * xn + lpf_sos_20[i][1] * lpf_x_buffer20[i][0] + lpf_sos_20[i][2] * lpf_x_buffer20[i][1]
-			- lpf_sos_20[i][4] * lpf_y_buffer20[i][0] - lpf_sos_20[i][5] * lpf_y_buffer20[i][1];
-
-			lpf_x_buffer20[i][1] = lpf_x_buffer20[i][0];
-			lpf_x_buffer20[i][0] = xn;
-			lpf_y_buffer20[i][1] = lpf_y_buffer20[i][0];
-			lpf_y_buffer20[i][0] = output;
-		    }
-	}
-	else if (ch == 2){
-
-			for (int i = 0; i < SECTIONS; i++) {
-				xn = (i == 0) ? input : output;
-
-				output = lpf_sos_2[i][0] * xn + lpf_sos_2[i][1] * lpf_x_buffer20[i][0] + lpf_sos_2[i][2] * lpf_x_buffer20[i][1]
-				- lpf_sos_2[i][4] * lpf_y_buffer20[i][0] - lpf_sos_2[i][5] * lpf_y_buffer20[i][1];
-
-				lpf_x_buffer20[i][1] = lpf_x_buffer20[i][0];
-				lpf_x_buffer20[i][0] = xn;
-				lpf_y_buffer20[i][1] = lpf_y_buffer20[i][0];
-				lpf_y_buffer20[i][0] = output;
-			    }
 		}
-	else if (ch == 4){
-
-				for (int i = 0; i < SECTIONS; i++) {
-					xn = (i == 0) ? input : output;
-
-					output = lpf_sos_4[i][0] * xn + lpf_sos_4[i][1] * lpf_x_buffer20[i][0] + lpf_sos_4[i][2] * lpf_x_buffer20[i][1]
-					- lpf_sos_4[i][4] * lpf_y_buffer20[i][0] - lpf_sos_4[i][5] * lpf_y_buffer20[i][1];
-
-					lpf_x_buffer20[i][1] = lpf_x_buffer20[i][0];
-					lpf_x_buffer20[i][0] = xn;
-					lpf_y_buffer20[i][1] = lpf_y_buffer20[i][0];
-					lpf_y_buffer20[i][0] = output;
-				    }
-			}
-	else if (ch == 3){
+	}
+	else if (cf == 3){
 
 	    for (int i = 0; i < SECTIONS; i++) {
 	        xn = (i == 0) ? input : output;
 
-	        output = lpf_sos_3[i][0] * xn + lpf_sos_3[i][1] * lpf_x_buffer30[i][0] + lpf_sos_3[i][2] * lpf_x_buffer30[i][1]
-	        - lpf_sos_3[i][4] * lpf_y_buffer30[i][0] - lpf_sos_3[i][5] * lpf_y_buffer30[i][1];
+	        output = lpf_sos_3[i][0] * xn + lpf_sos_3[i][1] * lpf_x_buffer10[i][0] + lpf_sos_3[i][2] * lpf_x_buffer10[i][1]
+	        - lpf_sos_3[i][4] * lpf_y_buffer10[i][0] - lpf_sos_3[i][5] * lpf_y_buffer10[i][1];
 
-	        lpf_x_buffer30[i][1] = lpf_x_buffer30[i][0];
-	        lpf_x_buffer30[i][0] = xn;
-	        lpf_y_buffer30[i][1] = lpf_y_buffer30[i][0];
-	        lpf_y_buffer30[i][0] = output;
+	        lpf_x_buffer10[i][1] = lpf_x_buffer10[i][0];
+	        lpf_x_buffer10[i][0] = xn;
+	        lpf_y_buffer10[i][1] = lpf_y_buffer10[i][0];
+	        lpf_y_buffer10[i][0] = output;
 	    }
+	}
+    return output;
+}
+
+float EMGBWLPF(float input) {
+	float output = 0;
+	float xn = 0;
+
+	for (int i = 0; i < SECTIONS; i++) {
+		xn = (i == 0) ? input : output;
+
+		output = lpf_sos_200[i][0] * xn + lpf_sos_200[i][1] * lpf_x_buffer200[i][0] + lpf_sos_200[i][2] * lpf_x_buffer200[i][1]
+		- lpf_sos_200[i][4] * lpf_y_buffer200[i][0] - lpf_sos_200[i][5] * lpf_y_buffer200[i][1];
+
+		lpf_x_buffer200[i][1] = lpf_x_buffer200[i][0];
+		lpf_x_buffer200[i][0] = xn;
+		lpf_y_buffer200[i][1] = lpf_y_buffer200[i][0];
+		lpf_y_buffer200[i][0] = output;
 	}
     return output;
 }
@@ -243,11 +173,11 @@ float lpf1_sos_3Hz[1][6] = {
 float lpf1_x_buffer[1] = {0};
 float lpf1_y_buffer[1] = {0};
 
-float BWLPF_1st(float input, int8_t ch) {
+float BWLPF_1st(float input, int8_t cf) {
     float output = 0;
     float xn = input; // 현재 입력 신호
 
-    if (ch == 1) { // 1Hz 1차 필터
+    if (cf == 1) { // 1Hz 1차 필터
             output = lpf1_sos_1Hz[0][0] * xn
                    + lpf1_sos_1Hz[0][1] * lpf1_x_buffer[0]
                    - lpf1_sos_1Hz[0][4] * lpf1_y_buffer[0];
@@ -255,14 +185,15 @@ float BWLPF_1st(float input, int8_t ch) {
             lpf1_x_buffer[0] = xn;         // 입력 버퍼 업데이트
             lpf1_y_buffer[0] = output;    // 출력 버퍼 업데이트
         }
-    else if (ch == 2) { // 2Hz 1차 필터
+    else if (cf == 2) { // 2Hz 1차 필터
         output = lpf1_sos_2Hz[0][0] * xn
                + lpf1_sos_2Hz[0][1] * lpf1_x_buffer[0]
                - lpf1_sos_2Hz[0][4] * lpf1_y_buffer[0];
 
         lpf1_x_buffer[0] = xn;         // 입력 버퍼 업데이트
         lpf1_y_buffer[0] = output;    // 출력 버퍼 업데이트
-    } else if (ch == 3) { // 3Hz 1차 필터
+
+    } else if (cf == 3) { // 3Hz 1차 필터
         output = lpf1_sos_3Hz[0][0] * xn
                + lpf1_sos_3Hz[0][1] * lpf1_x_buffer[0]
                - lpf1_sos_3Hz[0][4] * lpf1_y_buffer[0];
@@ -385,6 +316,26 @@ float HighPassFilter_Process(float input) {
 
 /****************************************************MOVING AVERAGE FILTER****************************************************/
 float MAF(float new_sample) {
+    static float samples[SAMPLE_SIZE] = {0};
+    static int index = 0;
+    static float sum = 0;
+    float average = 0;
+
+    // 이전 합계에서 가장 오래된 샘플 제거
+    sum -= samples[index];
+    // 새 샘플 추가
+    samples[index] = new_sample;
+    sum += new_sample;
+    // 다음 샘플을 위한 인덱스 업데이트
+    index = (index + 1) % SAMPLE_SIZE;
+
+    // 평균 계산
+    average = sum / SAMPLE_SIZE;
+
+    return average;
+}
+
+double MAFEMG(double new_sample) {
     static float samples[SAMPLE_SIZE] = {0};
     static int index = 0;
     static float sum = 0;

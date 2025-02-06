@@ -37,7 +37,7 @@
 
 /* Private define ------------------------------------------------------------*/
 /* USER CODE BEGIN PD */
-
+#define SBUF_SIZE 64
 /* USER CODE END PD */
 
 /* Private macro -------------------------------------------------------------*/
@@ -47,13 +47,23 @@
 
 /* Private variables ---------------------------------------------------------*/
 ADC_HandleTypeDef hadc1;
+DMA_HandleTypeDef hdma_adc1;
 
 TIM_HandleTypeDef htim2;
 TIM_HandleTypeDef htim3;
 TIM_HandleTypeDef htim4;
+TIM_HandleTypeDef htim8;
 
+UART_HandleTypeDef huart4;
+UART_HandleTypeDef huart5;
+UART_HandleTypeDef huart1;
 UART_HandleTypeDef huart2;
 UART_HandleTypeDef huart3;
+DMA_HandleTypeDef hdma_uart4_rx;
+DMA_HandleTypeDef hdma_uart5_rx;
+DMA_HandleTypeDef hdma_usart1_rx;
+DMA_HandleTypeDef hdma_usart2_rx;
+DMA_HandleTypeDef hdma_usart3_rx;
 
 /* USER CODE BEGIN PV */
 /******FLAGS******/
@@ -62,6 +72,7 @@ volatile uint8_t spi2Flag = 0;
 volatile uint8_t tempFlag = 1;
 volatile uint8_t expFlag = 0;
 volatile uint8_t actFlag = 0;
+volatile uint8_t adc1Flag = 0;
 
 /******COUNT******/
 uint32_t count = 0;
@@ -71,9 +82,12 @@ uint16_t sample_count = 0;
 /******SENSORS******/
 float temp = 0.0;
 float length = 0; //Length of stretch sensor
-uint8_t load_buf[20];
-float load;
+uint8_t force_buf[20];
+float force;
 uint8_t sign;
+uint32_t adcval1[1];
+double emg_raw = 0.0;
+double EMGMAF = 0.0;
 
 /******CONTROLLER******/
 float pgain = 1;
@@ -99,21 +113,46 @@ float prev_error = 0.0f;
 /******FILTER******/
 float alpha = 0.98;  //Coefficient of integral filter
 float prev_output = 0;  //Previous value of integral filter
+
+/******SERIAL COMMUNICATION SETTINGS******/
+uint8_t uart4_rx_buffer[UART4_RX_BUFFER_SIZE];
+uint8_t uart5_rx_buffer[UART5_RX_BUFFER_SIZE];
+
+// 기타 UART/USART DMA 수신 버퍼
+uint8_t usart1_rx_buffer[USART1_RX_BUFFER_SIZE];
+uint8_t usart2_rx_buffer[USART2_RX_BUFFER_SIZE];
+uint8_t usart3_rx_buffer[USART3_RX_BUFFER_SIZE];
+
+// IMU 파싱 결과 저장 (각 3개: Roll, Pitch, Yaw)
+float euler1[3] = {0};  // UART4
+float euler2[3] = {0};  // UART5
+
+float kneeAngleMAF = 0.0;
+
+// IMU 데이터 파싱 완료 플래그
+volatile uint8_t imu4_flag = 0;
+volatile uint8_t imu5_flag = 0;
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
 void SystemClock_Config(void);
 static void MX_GPIO_Init(void);
+static void MX_DMA_Init(void);
 static void MX_USART2_UART_Init(void);
 static void MX_TIM2_Init(void);
 static void MX_TIM4_Init(void);
 static void MX_USART3_UART_Init(void);
 static void MX_TIM3_Init(void);
 static void MX_ADC1_Init(void);
+static void MX_UART4_Init(void);
+static void MX_UART5_Init(void);
+static void MX_USART1_UART_Init(void);
+static void MX_TIM8_Init(void);
 /* USER CODE BEGIN PFP */
+float KneeAngleEstimation(void);
 float GetMatchingLength(float filteredValue);
 int _write(int file, char* p, int len){
-	HAL_UART_Transmit(&huart2, p, len, 1);
+	HAL_UART_Transmit(&huart2, (uint8_t*)p, len, 1);
 	return len;
 }
 
@@ -153,40 +192,74 @@ int main(void)
 
   /* Initialize all configured peripherals */
   MX_GPIO_Init();
+  MX_DMA_Init();
   MX_USART2_UART_Init();
   MX_TIM2_Init();
   MX_TIM4_Init();
   MX_USART3_UART_Init();
   MX_TIM3_Init();
   MX_ADC1_Init();
+  MX_UART4_Init();
+  MX_UART5_Init();
+  MX_USART1_UART_Init();
+  MX_TIM8_Init();
   /* USER CODE BEGIN 2 */
   HAL_TIM_IC_Start_IT(&htim2, TIM_CHANNEL_1);
   HAL_TIM_Base_Start_IT(&htim4);
   HAL_TIM_PWM_Start(&htim3, TIM_CHANNEL_2);
   HAL_TIM_PWM_Start(&htim3, TIM_CHANNEL_3);
-  HAL_UART_Receive_IT(&huart3, load_buf, 7);
-  HAL_UART_Receive_IT(&huart2, pid_buf, 4);
+  HAL_TIM_Base_Start(&htim8);
+  HAL_ADC_Start_DMA(&hadc1, adcval1, 1);
+  HAL_UART_Receive_DMA(&huart1, usart1_rx_buffer, USART1_RX_BUFFER_SIZE);
+  HAL_UART_Receive_DMA(&huart2, usart2_rx_buffer, USART2_RX_BUFFER_SIZE);
+  HAL_UART_Receive_DMA(&huart3, usart3_rx_buffer, USART3_RX_BUFFER_SIZE);
+  HAL_UART_Receive_DMA(&huart4, uart4_rx_buffer, UART4_RX_BUFFER_SIZE);
+  HAL_UART_Receive_DMA(&huart5, uart5_rx_buffer, UART5_RX_BUFFER_SIZE);
+  __HAL_UART_ENABLE_IT(&huart1, UART_IT_IDLE);
+  __HAL_UART_ENABLE_IT(&huart2, UART_IT_IDLE);
+  __HAL_UART_ENABLE_IT(&huart3, UART_IT_IDLE);
+  __HAL_UART_ENABLE_IT(&huart4, UART_IT_IDLE);
+  __HAL_UART_ENABLE_IT(&huart5, UART_IT_IDLE);
+  /**
+   * @EBIMU commands
+   */
+  HAL_UART_Transmit(&huart4, (uint8_t*)"<sor2>", strlen("<sor2>"), 1);
+  HAL_UART_Transmit(&huart5, (uint8_t*)"<sor2>", strlen("<sor2>"), 1);
+  HAL_Delay(500);
 
-  if(!begin()){
-        printf("Could not initialize thermocouple\r\n");
-        while (1) HAL_Delay(10);
-  }
+  HAL_UART_Transmit(&huart4, (uint8_t*)"<sem0>", strlen("<sem0>"), 1);
+  HAL_UART_Transmit(&huart5, (uint8_t*)"<sem0>", strlen("<sem0>"), 1);
+  HAL_Delay(500);
 
-  if (TMP006_Init(&hi2c1) != HAL_OK)
-  {
-      printf("TMP006 init error\r\n");
-  }
+  // 오일러각 출력모드 설정
+  HAL_UART_Transmit(&huart4, (uint8_t*)"<sof1>", strlen("<sof1>"), 1);
+  HAL_UART_Transmit(&huart5, (uint8_t*)"<sof1>", strlen("<sof1>"), 1);
+  HAL_Delay(500);
+
+  // 현재 자세 기준 설정
+  HAL_UART_Transmit(&huart4, (uint8_t*)"<cmo>", strlen("<cmo>"), 1);
+  HAL_UART_Transmit(&huart5, (uint8_t*)"<cmo>", strlen("<cmo>"), 1);
+  HAL_Delay(500);
+
+  HAL_UART_Transmit(&huart4, (uint8_t*)"<start>", strlen("<start>"), 1);
+  HAL_UART_Transmit(&huart5, (uint8_t*)"<start>", strlen("<start>"), 1);
+  HAL_Delay(500);
+
+
   /* USER CODE END 2 */
 
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
   while (1){
-/******GET TEMPERATURE******/
-	  /*if (spi2Flag == 1){
-		  temp = readCelsius();
-		  spi2Flag = 0;
-		  tempFlag = 1;
-	  }*/
+/******GET EMG DATA******/
+	  if(adc1Flag == 1){
+		  adc1Flag = 0;
+		  emg_raw = adcval1[0];
+		  double HPFEMG = EMGBWHPF(emg_raw);
+		  double RECEMG = fabs(HPFEMG);
+		  double LPFEMG = EMGBWLPF(RECEMG);
+		  EMGMAF = MAFEMG(LPFEMG);
+	  }
 
 /******EXPERIMENT******/
 	  if (expFlag == 1) {
@@ -202,35 +275,21 @@ int main(void)
 	  }
 
 /******MAIN******/
-	  if (tim4Flag == 1 && spi2Flag == 0){
+	  if (tim4Flag == 1){
 		  tim4Flag = 0;
+		  //printf("1.12555\r\n");
 
-		  uint32_t currentTick = HAL_GetTick(); // 현재 시간 (ms)
-		      uint32_t diff;
+		  //printf("%f\r\n", LPFEMG2);
+		  printf("%f\r\n", EMGMAF);
+		  UpdateDeltaTime();
+		  UpdatePIDControl(force);
 
-		      // HAL_GetTick()는 32비트 정수이므로 overflow(rollover)를 고려
-		      if (currentTick >= lastTick) {
-		          diff = currentTick - lastTick;
-		      } else {
-		          diff = (0xFFFFFFFF - lastTick) + currentTick + 1;
-		      }
-		      // diff는 밀리초 단위이므로 초 단위로 변환
-		      dt = diff / 1000.0f;
+		  float filtered_streth = BWLPF(count, 4);
+		  length = GetMatchingLength(filtered_streth);
+		  //float EMGHPF =
+		  kneeAngleMAF = KneeAngleEstimation();  // 함수 반환값을 변수에 저장
 
-		      // dt가 너무 작아 0이 되는 것을 방지 (최소 dt 설정)
-		      if(dt < 0.0001f) {
-		          dt = 0.0001f;
-		      }
-
-		      // 마지막 시각 업데이트
-		      lastTick = currentTick;
-
-		  UpdatePIDControl(load);
-
-		  float filtered_IF = IntegralFilter(count, &prev_output, alpha);
-		  float filtered_BW = BWLPF(count, 4);
-		  length = GetMatchingLength(filtered_BW);
-		  printf("%.2f,%.2f,%.2f,%.2f\r\n", temp, load, length, target_force);
+		  //printf("%.2f,%.2f,%.2f,%.2f,%.2f\r\n", temp, force, length, kneeAngleMAF, target_force);
 
 		  sample_count++;
 		  count = 0;
@@ -331,11 +390,11 @@ static void MX_ADC1_Init(void)
   hadc1.Init.ScanConvMode = DISABLE;
   hadc1.Init.ContinuousConvMode = DISABLE;
   hadc1.Init.DiscontinuousConvMode = DISABLE;
-  hadc1.Init.ExternalTrigConvEdge = ADC_EXTERNALTRIGCONVEDGE_NONE;
-  hadc1.Init.ExternalTrigConv = ADC_SOFTWARE_START;
+  hadc1.Init.ExternalTrigConvEdge = ADC_EXTERNALTRIGCONVEDGE_RISING;
+  hadc1.Init.ExternalTrigConv = ADC_EXTERNALTRIGCONV_T8_TRGO;
   hadc1.Init.DataAlign = ADC_DATAALIGN_RIGHT;
   hadc1.Init.NbrOfConversion = 1;
-  hadc1.Init.DMAContinuousRequests = DISABLE;
+  hadc1.Init.DMAContinuousRequests = ENABLE;
   hadc1.Init.EOCSelection = ADC_EOC_SINGLE_CONV;
   if (HAL_ADC_Init(&hadc1) != HAL_OK)
   {
@@ -346,7 +405,7 @@ static void MX_ADC1_Init(void)
   */
   sConfig.Channel = ADC_CHANNEL_0;
   sConfig.Rank = 1;
-  sConfig.SamplingTime = ADC_SAMPLETIME_3CYCLES;
+  sConfig.SamplingTime = ADC_SAMPLETIME_56CYCLES;
   if (HAL_ADC_ConfigChannel(&hadc1, &sConfig) != HAL_OK)
   {
     Error_Handler();
@@ -524,6 +583,151 @@ static void MX_TIM4_Init(void)
 }
 
 /**
+  * @brief TIM8 Initialization Function
+  * @param None
+  * @retval None
+  */
+static void MX_TIM8_Init(void)
+{
+
+  /* USER CODE BEGIN TIM8_Init 0 */
+
+  /* USER CODE END TIM8_Init 0 */
+
+  TIM_ClockConfigTypeDef sClockSourceConfig = {0};
+  TIM_MasterConfigTypeDef sMasterConfig = {0};
+
+  /* USER CODE BEGIN TIM8_Init 1 */
+
+  /* USER CODE END TIM8_Init 1 */
+  htim8.Instance = TIM8;
+  htim8.Init.Prescaler = 1;
+  htim8.Init.CounterMode = TIM_COUNTERMODE_UP;
+  htim8.Init.Period = 44999;
+  htim8.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
+  htim8.Init.RepetitionCounter = 0;
+  htim8.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_DISABLE;
+  if (HAL_TIM_Base_Init(&htim8) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  sClockSourceConfig.ClockSource = TIM_CLOCKSOURCE_INTERNAL;
+  if (HAL_TIM_ConfigClockSource(&htim8, &sClockSourceConfig) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  sMasterConfig.MasterOutputTrigger = TIM_TRGO_UPDATE;
+  sMasterConfig.MasterSlaveMode = TIM_MASTERSLAVEMODE_DISABLE;
+  if (HAL_TIMEx_MasterConfigSynchronization(&htim8, &sMasterConfig) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  /* USER CODE BEGIN TIM8_Init 2 */
+
+  /* USER CODE END TIM8_Init 2 */
+
+}
+
+/**
+  * @brief UART4 Initialization Function
+  * @param None
+  * @retval None
+  */
+static void MX_UART4_Init(void)
+{
+
+  /* USER CODE BEGIN UART4_Init 0 */
+
+  /* USER CODE END UART4_Init 0 */
+
+  /* USER CODE BEGIN UART4_Init 1 */
+
+  /* USER CODE END UART4_Init 1 */
+  huart4.Instance = UART4;
+  huart4.Init.BaudRate = 115200;
+  huart4.Init.WordLength = UART_WORDLENGTH_8B;
+  huart4.Init.StopBits = UART_STOPBITS_1;
+  huart4.Init.Parity = UART_PARITY_NONE;
+  huart4.Init.Mode = UART_MODE_TX_RX;
+  huart4.Init.HwFlowCtl = UART_HWCONTROL_NONE;
+  huart4.Init.OverSampling = UART_OVERSAMPLING_16;
+  if (HAL_UART_Init(&huart4) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  /* USER CODE BEGIN UART4_Init 2 */
+
+  /* USER CODE END UART4_Init 2 */
+
+}
+
+/**
+  * @brief UART5 Initialization Function
+  * @param None
+  * @retval None
+  */
+static void MX_UART5_Init(void)
+{
+
+  /* USER CODE BEGIN UART5_Init 0 */
+
+  /* USER CODE END UART5_Init 0 */
+
+  /* USER CODE BEGIN UART5_Init 1 */
+
+  /* USER CODE END UART5_Init 1 */
+  huart5.Instance = UART5;
+  huart5.Init.BaudRate = 115200;
+  huart5.Init.WordLength = UART_WORDLENGTH_8B;
+  huart5.Init.StopBits = UART_STOPBITS_1;
+  huart5.Init.Parity = UART_PARITY_NONE;
+  huart5.Init.Mode = UART_MODE_TX_RX;
+  huart5.Init.HwFlowCtl = UART_HWCONTROL_NONE;
+  huart5.Init.OverSampling = UART_OVERSAMPLING_16;
+  if (HAL_UART_Init(&huart5) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  /* USER CODE BEGIN UART5_Init 2 */
+
+  /* USER CODE END UART5_Init 2 */
+
+}
+
+/**
+  * @brief USART1 Initialization Function
+  * @param None
+  * @retval None
+  */
+static void MX_USART1_UART_Init(void)
+{
+
+  /* USER CODE BEGIN USART1_Init 0 */
+
+  /* USER CODE END USART1_Init 0 */
+
+  /* USER CODE BEGIN USART1_Init 1 */
+
+  /* USER CODE END USART1_Init 1 */
+  huart1.Instance = USART1;
+  huart1.Init.BaudRate = 115200;
+  huart1.Init.WordLength = UART_WORDLENGTH_8B;
+  huart1.Init.StopBits = UART_STOPBITS_1;
+  huart1.Init.Parity = UART_PARITY_NONE;
+  huart1.Init.Mode = UART_MODE_TX_RX;
+  huart1.Init.HwFlowCtl = UART_HWCONTROL_NONE;
+  huart1.Init.OverSampling = UART_OVERSAMPLING_16;
+  if (HAL_UART_Init(&huart1) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  /* USER CODE BEGIN USART1_Init 2 */
+
+  /* USER CODE END USART1_Init 2 */
+
+}
+
+/**
   * @brief USART2 Initialization Function
   * @param None
   * @retval None
@@ -590,6 +794,38 @@ static void MX_USART3_UART_Init(void)
 }
 
 /**
+  * Enable DMA controller clock
+  */
+static void MX_DMA_Init(void)
+{
+
+  /* DMA controller clock enable */
+  __HAL_RCC_DMA1_CLK_ENABLE();
+  __HAL_RCC_DMA2_CLK_ENABLE();
+
+  /* DMA interrupt init */
+  /* DMA1_Stream0_IRQn interrupt configuration */
+  HAL_NVIC_SetPriority(DMA1_Stream0_IRQn, 1, 0);
+  HAL_NVIC_EnableIRQ(DMA1_Stream0_IRQn);
+  /* DMA1_Stream1_IRQn interrupt configuration */
+  HAL_NVIC_SetPriority(DMA1_Stream1_IRQn, 1, 0);
+  HAL_NVIC_EnableIRQ(DMA1_Stream1_IRQn);
+  /* DMA1_Stream2_IRQn interrupt configuration */
+  HAL_NVIC_SetPriority(DMA1_Stream2_IRQn, 1, 0);
+  HAL_NVIC_EnableIRQ(DMA1_Stream2_IRQn);
+  /* DMA1_Stream5_IRQn interrupt configuration */
+  HAL_NVIC_SetPriority(DMA1_Stream5_IRQn, 1, 0);
+  HAL_NVIC_EnableIRQ(DMA1_Stream5_IRQn);
+  /* DMA2_Stream0_IRQn interrupt configuration */
+  HAL_NVIC_SetPriority(DMA2_Stream0_IRQn, 0, 0);
+  HAL_NVIC_EnableIRQ(DMA2_Stream0_IRQn);
+  /* DMA2_Stream2_IRQn interrupt configuration */
+  HAL_NVIC_SetPriority(DMA2_Stream2_IRQn, 1, 0);
+  HAL_NVIC_EnableIRQ(DMA2_Stream2_IRQn);
+
+}
+
+/**
   * @brief GPIO Initialization Function
   * @param None
   * @retval None
@@ -605,6 +841,7 @@ static void MX_GPIO_Init(void)
   __HAL_RCC_GPIOH_CLK_ENABLE();
   __HAL_RCC_GPIOA_CLK_ENABLE();
   __HAL_RCC_GPIOB_CLK_ENABLE();
+  __HAL_RCC_GPIOD_CLK_ENABLE();
 
   /*Configure GPIO pin Output Level */
   HAL_GPIO_WritePin(GPIOC, GPIO_PIN_0, GPIO_PIN_RESET);
@@ -661,59 +898,14 @@ static void MX_GPIO_Init(void)
 }
 
 /* USER CODE BEGIN 4 */
+/* Timer interrupt callback */
 void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim){
 	if(htim->Instance==TIM4){
 		tim4Flag = 1;
 	}
 }
 
-void HAL_TIM_IC_CaptureCallback(TIM_HandleTypeDef *htim){
-	if (htim->Instance == TIM2 && htim->Channel == HAL_TIM_ACTIVE_CHANNEL_1)
-	{
-		HAL_GPIO_WritePin(GPIOC, GPIO_PIN_3, GPIO_PIN_RESET);
-		count = TIM2->CCR1;
-	}
-}
-
-void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart) {
-    if (huart->Instance == USART3) {
-        sscanf((char *)load_buf, "%f", &load);
-        HAL_UART_Receive_IT(&huart3, load_buf, 7);
-    }
-
-    if (huart->Instance == USART2) {
-		// UART2는 PID 조절 명령을 수신 (예: "P3.2")
-		// 4바이트 명령 수신이므로 인덱스 4에 null 문자 추가
-		pid_buf[4] = '\0';
-
-		char cmd = pid_buf[0];
-		float value;
-		if (sscanf((char *)pid_buf + 1, "%f", &value) == 1) {
-			switch (cmd) {
-				case 'P':
-					pgain = value;
-					printf("Updated pgain: %.1f\r\n", pgain);
-					break;
-				case 'I':
-					igain = value;
-					printf("Updated igain: %.1f\r\n", igain);
-					break;
-				case 'D':
-					dgain = value;
-					printf("Updated dgain: %.1f\r\n", dgain);
-					break;
-				default:
-					printf("Unknown PID command: %c\r\n", cmd);
-					break;
-			}
-		} else {
-			printf("Failed to parse PID command.\r\n");
-		}
-		// 다음 PID 명령 수신 준비
-		HAL_UART_Receive_IT(&huart2, pid_buf, 4);
-	}
-}
-
+/* EXTI Callback */
 void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)
 {
     if(GPIO_Pin == B1_Pin)  // B1 버튼에 연결된 핀인지 확인
@@ -733,7 +925,186 @@ void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)
     }
 }
 
+/**
+ * @brief Captures the value of timer when the capacitor had charged for measuring time constant of the stretch sensor.
+ */
+void HAL_TIM_IC_CaptureCallback(TIM_HandleTypeDef *htim){
+	if (htim->Instance == TIM2 && htim->Channel == HAL_TIM_ACTIVE_CHANNEL_1)
+	{
+		HAL_GPIO_WritePin(GPIOC, GPIO_PIN_3, GPIO_PIN_RESET);
+		count = TIM2->CCR1;
+	}
+}
 
+/**
+ * @brief Common UART Idle processing.
+ *        Called from each UART IRQ Handler.
+ */
+void UART_IdleProcess(UART_HandleTypeDef *huart, uint8_t *rx_buffer, uint16_t buffer_size)
+{
+    if(__HAL_UART_GET_FLAG(huart, UART_FLAG_IDLE))
+    {
+        __HAL_UART_CLEAR_IDLEFLAG(huart);
+        HAL_UART_DMAStop(huart);
+        uint16_t rx_length = buffer_size - __HAL_DMA_GET_COUNTER(huart->hdmarx);
+        if(rx_length > 0)
+        {
+            ProcessData(rx_buffer, rx_length, huart);
+        }
+        HAL_UART_Receive_DMA(huart, rx_buffer, buffer_size);
+    }
+}
+
+/**
+ * @brief Process received data.
+ *        For USART2, parse PID command; otherwise, echo data via huart2.
+ */
+void ProcessData(uint8_t* data, uint16_t len, UART_HandleTypeDef *huart)
+{
+    if(huart->Instance == USART2)
+    {
+        char pid_cmd[128] = {0};
+        uint16_t copy_len = (len < 127 ? len : 127);
+        memcpy(pid_cmd, data, copy_len);
+        pid_cmd[copy_len] = '\0';
+
+        char cmd = pid_cmd[0];
+        float value;
+        if(sscanf(pid_cmd + 1, "%f", &value) == 1)
+        {
+            switch(cmd)
+            {
+                case 'P':
+                    pgain = value;
+                    //printf("Updated pgain: %.1f\r\n", pgain);
+                    break;
+                case 'I':
+                    igain = value;
+                    //printf("Updated igain: %.1f\r\n", igain);
+                    break;
+                case 'D':
+                    dgain = value;
+                    //printf("Updated dgain: %.1f\r\n", dgain);
+                    break;
+                default:
+                    //printf("Unknown PID command: %c\r\n", cmd);
+                    break;
+            }
+        }
+        else
+        {
+            printf(pid_cmd);
+        }
+    }
+    else if(huart->Instance == USART1){
+		// uart1로 받은 데이터를 온도값으로 파싱하여 temp 변수에 저장
+		char temp_str[128] = {0};
+		uint16_t copy_len = (len < 127 ? len : 127);
+		memcpy(temp_str, data, copy_len);
+		temp_str[copy_len] = '\0';
+
+		float new_temp;
+		if(sscanf(temp_str, "%f", &new_temp) == 1)
+		{
+			temp = new_temp;
+			//printf("Updated temp: %.2f\r\n", temp);
+		}
+		else
+		{
+			//printf("Failed to parse temp: %s\r\n", temp_str);
+		}
+	}
+    else if(huart->Instance == USART3){
+		// uart3로 받은 데이터를 온도값으로 파싱하여 force 변수에 저장
+		char force_str[128] = {0};
+		uint16_t copy_len = (len < 127 ? len : 127);
+		memcpy(force_str, data, copy_len);
+		force_str[copy_len] = '\0';
+
+		float new_force;
+		if(sscanf(force_str, "%f", &new_force) == 1)
+		{
+			force = new_force;
+			//printf("Updated temp: %.2f\r\n", temp);
+		}
+		else
+		{
+			//printf("Failed to parse temp: %s\r\n", temp_str);
+		}
+	}
+    else if(huart->Instance == UART4){
+        char buf[SBUF_SIZE] = {0};
+        uint16_t copy_len = (len < (SBUF_SIZE - 1) ? len : (SBUF_SIZE - 1));
+        memcpy(buf, data, copy_len);
+        buf[copy_len] = '\0';
+        char *token = strtok(buf, ",");
+        float items[3] = {0};
+        int i = 0;
+        while(token != NULL && i < 3)
+        {
+            items[i] = atof(token);
+            token = strtok(NULL, ",");
+            i++;
+        }
+        // 저장: 허벅지 IMU 데이터를 euler1 배열에 저장
+        euler1[0] = items[0];
+        euler1[1] = items[1];
+        euler1[2] = items[2];
+        //printf("%.2f\r\n", euler1[0]);
+
+        imu4_flag = 1;
+    }
+    else if(huart->Instance == UART5){
+        char buf[SBUF_SIZE] = {0};
+        uint16_t copy_len = (len < (SBUF_SIZE - 1) ? len : (SBUF_SIZE - 1));
+        memcpy(buf, data, copy_len);
+        buf[copy_len] = '\0';
+        char *token = strtok(buf, ",");
+        float items[3] = {0};
+        int i = 0;
+        while(token != NULL && i < 3)
+        {
+            items[i] = atof(token);
+            token = strtok(NULL, ",");
+            i++;
+        }
+        euler2[0] = items[0];
+        euler2[1] = items[1];
+        euler2[2] = items[2];
+        printf("%.2f\r\n", euler2[0]);
+        //printf("2\r\n");
+        imu5_flag = 1;
+    }
+}
+/**
+ * @brief Estimating the Knee Angle.
+ */
+float KneeAngleEstimation(void) {
+    static float lastKneeAngle = 0.0f;  // 이전 무릎 각도 저장 변수
+
+    if (imu4_flag && imu5_flag) {
+        float kneeAngle = euler2[0] - euler1[0];  // 두 IMU 센서의 Roll 값 차이
+        if (kneeAngle > 180)
+            kneeAngle -= 360;
+        if (kneeAngle < -180)
+            kneeAngle += 360;
+
+        float filteredAngle = MAF(kneeAngle);  // MAF()는 이동평균 필터 함수 (별도로 구현)
+
+        lastKneeAngle = filteredAngle;  // 새로운 값으로 업데이트
+        imu4_flag = 0;
+        imu5_flag = 0;
+        return filteredAngle;
+    }
+
+    // 새로운 데이터가 준비되지 않았으면 이전 값을 반환
+    return lastKneeAngle;
+}
+
+
+/**
+ * @brief Returns matching length from filtered value of stretch sensor data.
+ */
 float GetMatchingLength(float filteredValue) {
 
 	float result = 0.0083815 * filteredValue - 232.04;
@@ -747,59 +1118,83 @@ float GetMatchingLength(float filteredValue) {
 	}
 }
 
-void UpdatePIDControl(float measured_force) {
-    // 오차 계산 (목표값과 측정값의 차이)
+/**
+ * @brief Update PID control based on measured force.
+ */
+void UpdatePIDControl(float measured_force)
+{
     real_error = target_force - measured_force;
-
-    // 적분 항 업데이트 (dt 사용)
     acc_error += real_error * dt;
-
-    // 미분 항 계산 (현재 오차와 이전 오차의 차이를 dt로 나눔)
     error_gap = real_error - prev_error;
     prev_error = real_error;
 
-    // 개별 PID 항 계산
     p_control = pgain * real_error;
     i_control = igain * acc_error;
     d_control = dgain * (error_gap / dt);
 
-    // PID 출력 합산
     pid_control = p_control + i_control + d_control;
 
-    // PID 출력값을 -100 ~ +100 범위로 제한
-    if (pid_control > 100.0f) {
+    if(pid_control > 100.0f)
+    {
         pid_control = 100.0f;
     }
-    if (pid_control < -100.0f) {
+    if(pid_control < -100.0f)
+    {
         pid_control = -100.0f;
     }
 
-    // TIM3의 PWM Period (ARR 값) 획득
     uint32_t period = __HAL_TIM_GET_AUTORELOAD(&htim3);
 
-    if (pid_control >= 0) {
-        // 히터(가열) 모드: SMA 구동기를 TIM3 채널2로 PWM 제어
+    if(pid_control >= 0)
+    {
         uint32_t heater_compare = (uint32_t)((pid_control / 100.0f) * period);
-
-        // 온도가 너무 높으면(예: temp ≥ 90) 안전을 위해 히터 OFF
-        if (temp >= 80) {
+        if(temp >= 80)
+        {
             heater_compare = 0;
         }
         __HAL_TIM_SET_COMPARE(&htim3, TIM_CHANNEL_2, heater_compare);
-
-        // 냉각팬 PWM (TIM3 채널3)은 OFF
         __HAL_TIM_SET_COMPARE(&htim3, TIM_CHANNEL_3, 0);
     }
-    else {
-        // 냉각 모드: pid_control이 음수이면, 히터는 OFF하고 냉각팬을 PWM 제어
-        __HAL_TIM_SET_COMPARE(&htim3, TIM_CHANNEL_2, 0);  // 히터 OFF
-
-        // 음수값의 절대값을 팬의 PWM 듀티비로 사용 (0~100% 매핑)
-        float fan_duty = fabs(pid_control);  // 예: pid_control = -30 → fan_duty = 30 (%)
+    else
+    {
+        __HAL_TIM_SET_COMPARE(&htim3, TIM_CHANNEL_2, 0);
+        float fan_duty = fabs(pid_control);
         uint32_t fan_compare = (uint32_t)((fan_duty / 100.0f) * period);
         __HAL_TIM_SET_COMPARE(&htim3, TIM_CHANNEL_3, fan_compare);
     }
 }
+
+/**
+ * @brief Update timer (dt) using HAL_GetTick()
+ */
+void UpdateDeltaTime(void)
+{
+    uint32_t currentTick = HAL_GetTick();
+    uint32_t diff;
+
+    if(currentTick >= lastTick)
+    {
+        diff = currentTick - lastTick;
+    }
+    else
+    {
+        diff = (0xFFFFFFFF - lastTick) + currentTick + 1;
+    }
+
+    dt = diff / 1000.0f;
+    if(dt < 0.0001f)
+    {
+        dt = 0.0001f;
+    }
+    lastTick = currentTick;
+}
+
+void HAL_ADC_ConvCpltCallback(ADC_HandleTypeDef* hadc){
+	if(hadc->Instance == ADC1){
+		adc1Flag = 1;
+	}
+}
+
 /* USER CODE END 4 */
 
 /**

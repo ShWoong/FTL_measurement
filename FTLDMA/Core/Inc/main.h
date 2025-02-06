@@ -36,7 +36,24 @@ extern "C" {
 
 /* Exported types ------------------------------------------------------------*/
 /* USER CODE BEGIN ET */
+/******SERIAL COMMUNICATION SETTINGS******/
+#define UART4_RX_BUFFER_SIZE   128
+#define UART5_RX_BUFFER_SIZE   128
+#define USART1_RX_BUFFER_SIZE  128
+#define USART2_RX_BUFFER_SIZE  128
+#define USART3_RX_BUFFER_SIZE  128
 
+extern uint8_t uart4_rx_buffer[UART4_RX_BUFFER_SIZE];
+extern uint8_t uart5_rx_buffer[UART5_RX_BUFFER_SIZE];
+extern uint8_t usart1_rx_buffer[USART1_RX_BUFFER_SIZE];
+extern uint8_t usart2_rx_buffer[USART2_RX_BUFFER_SIZE];
+extern uint8_t usart3_rx_buffer[USART3_RX_BUFFER_SIZE];
+
+extern volatile uint16_t uart4_prev_index;
+extern volatile uint16_t uart5_prev_index;
+extern volatile uint16_t usart1_prev_index;
+extern volatile uint16_t usart2_prev_index;
+extern volatile uint16_t usart3_prev_index;
 /* USER CODE END ET */
 
 /* Exported constants --------------------------------------------------------*/
@@ -55,7 +72,9 @@ void HAL_TIM_MspPostInit(TIM_HandleTypeDef *htim);
 void Error_Handler(void);
 
 /* USER CODE BEGIN EFP */
-
+void UpdateDeltaTime(void);
+void UART_IdleProcess(UART_HandleTypeDef *huart, uint8_t *rx_buffer, uint16_t buffer_size);
+void ProcessData(uint8_t* data, uint16_t len, UART_HandleTypeDef *huart);
 /* USER CODE END EFP */
 
 /* Private defines -----------------------------------------------------------*/
@@ -64,8 +83,8 @@ void Error_Handler(void);
 #define B1_EXTI_IRQn EXTI15_10_IRQn
 #define CG_Pin GPIO_PIN_3
 #define CG_GPIO_Port GPIOC
-#define THERMISTOR_Pin GPIO_PIN_0
-#define THERMISTOR_GPIO_Port GPIOA
+#define EMG_Pin GPIO_PIN_0
+#define EMG_GPIO_Port GPIOA
 #define USART_TX_Pin GPIO_PIN_2
 #define USART_TX_GPIO_Port GPIOA
 #define USART_RX_Pin GPIO_PIN_3

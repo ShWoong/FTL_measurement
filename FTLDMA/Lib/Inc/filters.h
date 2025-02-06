@@ -7,11 +7,12 @@
 #define FILTER_ORDER 2
 #define SECTIONS 1
 //#define FILTER_TAP_NUM 100
-#define SAMPLE_SIZE 400
+#define SAMPLE_SIZE 100
 #define FILTER_TAP_NUM 100
 #define HPFILTER_TAP_NUM 101
 
-float BWHPF(float input, int8_t ch);
+float EMGBWHPF(float input);
+float EMGBWLPF(float input);
 float BWLPF(float input, int8_t ch);
 float BWLPF_1st(float input, int8_t ch);
 float NEURAL_ACTIVATION(float emg);
@@ -22,6 +23,7 @@ float EMG_SENSOR(void);
 void FIR_Init(int num_taps, float cutoff_freq, float fs);
 float FIR_Process(float input);
 float MAF(float new_sample);
+double MAFEMG(double new_sample);
 float EWMAF(float new_measurement, float prev_ewma, float alpha);
 float IntegralFilter(float input, float *prev_output, float alpha);
 
