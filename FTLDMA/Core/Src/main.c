@@ -38,6 +38,7 @@
 /* Private define ------------------------------------------------------------*/
 /* USER CODE BEGIN PD */
 #define SBUF_SIZE 64
+#define PI 3.14159265358979323846
 /* USER CODE END PD */
 
 /* Private macro -------------------------------------------------------------*/
@@ -47,7 +48,6 @@
 
 /* Private variables ---------------------------------------------------------*/
 ADC_HandleTypeDef hadc1;
-DMA_HandleTypeDef hdma_adc1;
 
 TIM_HandleTypeDef htim2;
 TIM_HandleTypeDef htim3;
@@ -78,6 +78,7 @@ volatile uint8_t adc1Flag = 0;
 uint32_t count = 0;
 uint8_t exp_count = 0;
 uint16_t sample_count = 0;
+volatile uint32_t cycle_counter = 0;
 
 /******SENSORS******/
 float temp = 0.0;
@@ -90,9 +91,9 @@ double emg_raw = 0.0;
 double EMGMAF = 0.0;
 
 /******CONTROLLER******/
-float pgain = 1;
-float igain = 1;
-float dgain = 1;
+float pgain = 0.0;
+float igain = 0.0;
+float dgain = 0.0;
 
 float target_temp = 30.0;
 float target_force = 0.0;
@@ -124,8 +125,8 @@ uint8_t usart2_rx_buffer[USART2_RX_BUFFER_SIZE];
 uint8_t usart3_rx_buffer[USART3_RX_BUFFER_SIZE];
 
 // IMU 파싱 결과 저장 (각 3개: Roll, Pitch, Yaw)
-float euler1[3] = {0};  // UART4
-float euler2[3] = {0};  // UART5
+float euler1[6] = {0};  // UART4
+float euler2[6] = {0};  // UART5
 
 float kneeAngleMAF = 0.0;
 
@@ -144,10 +145,10 @@ static void MX_TIM4_Init(void);
 static void MX_USART3_UART_Init(void);
 static void MX_TIM3_Init(void);
 static void MX_ADC1_Init(void);
-static void MX_UART4_Init(void);
 static void MX_UART5_Init(void);
 static void MX_USART1_UART_Init(void);
 static void MX_TIM8_Init(void);
+static void MX_UART4_Init(void);
 /* USER CODE BEGIN PFP */
 float KneeAngleEstimation(void);
 float GetMatchingLength(float filteredValue);
@@ -199,10 +200,10 @@ int main(void)
   MX_USART3_UART_Init();
   MX_TIM3_Init();
   MX_ADC1_Init();
-  MX_UART4_Init();
   MX_UART5_Init();
   MX_USART1_UART_Init();
   MX_TIM8_Init();
+  MX_UART4_Init();
   /* USER CODE BEGIN 2 */
   HAL_TIM_IC_Start_IT(&htim2, TIM_CHANNEL_1);
   HAL_TIM_Base_Start_IT(&htim4);
@@ -223,26 +224,39 @@ int main(void)
   /**
    * @EBIMU commands
    */
-  HAL_UART_Transmit(&huart4, (uint8_t*)"<sor2>", strlen("<sor2>"), 1);
-  HAL_UART_Transmit(&huart5, (uint8_t*)"<sor2>", strlen("<sor2>"), 1);
+
+  /*HAL_UART_Transmit(&huart4, (uint8_t*)"<reset>", strlen("<reset>"), 100);
+  HAL_UART_Transmit(&huart5, (uint8_t*)"<reset>", strlen("<reset>"), 100);
+  HAL_Delay(500);*/
+
+  HAL_UART_Transmit(&huart4, (uint8_t*)"<sb6>", strlen("<sb6>"), 100);
+  HAL_UART_Transmit(&huart5, (uint8_t*)"<sb6>", strlen("<sb6>"), 100);
   HAL_Delay(500);
 
-  HAL_UART_Transmit(&huart4, (uint8_t*)"<sem0>", strlen("<sem0>"), 1);
-  HAL_UART_Transmit(&huart5, (uint8_t*)"<sem0>", strlen("<sem0>"), 1);
+  HAL_UART_Transmit(&huart4, (uint8_t*)"<sor10>", strlen("<sor10>"), 100);
+  HAL_UART_Transmit(&huart5, (uint8_t*)"<sor10>", strlen("<sor10>"), 100);
+  HAL_Delay(500);
+
+  HAL_UART_Transmit(&huart4, (uint8_t*)"<soc1>", strlen("<soc1>"), 100);
+  HAL_UART_Transmit(&huart5, (uint8_t*)"<soc1>", strlen("<soc1>"), 100);
+  HAL_Delay(500);
+
+  HAL_UART_Transmit(&huart4, (uint8_t*)"<sem0>", strlen("<sem0>"), 100);
+  HAL_UART_Transmit(&huart5, (uint8_t*)"<sem0>", strlen("<sem0>"), 100);
   HAL_Delay(500);
 
   // 오일러각 출력모드 설정
-  HAL_UART_Transmit(&huart4, (uint8_t*)"<sof1>", strlen("<sof1>"), 1);
-  HAL_UART_Transmit(&huart5, (uint8_t*)"<sof1>", strlen("<sof1>"), 1);
+  HAL_UART_Transmit(&huart4, (uint8_t*)"<sof1>", strlen("<sof1>"), 100);
+  HAL_UART_Transmit(&huart5, (uint8_t*)"<sof1>", strlen("<sof1>"), 100);
+  HAL_Delay(500);
+
+  HAL_UART_Transmit(&huart4, (uint8_t*)"<soa5>", strlen("<soa5>"), 100);
+  HAL_UART_Transmit(&huart5, (uint8_t*)"<soa5>", strlen("<soa5>"), 100);
   HAL_Delay(500);
 
   // 현재 자세 기준 설정
-  HAL_UART_Transmit(&huart4, (uint8_t*)"<cmo>", strlen("<cmo>"), 1);
-  HAL_UART_Transmit(&huart5, (uint8_t*)"<cmo>", strlen("<cmo>"), 1);
-  HAL_Delay(500);
-
-  HAL_UART_Transmit(&huart4, (uint8_t*)"<start>", strlen("<start>"), 1);
-  HAL_UART_Transmit(&huart5, (uint8_t*)"<start>", strlen("<start>"), 1);
+  HAL_UART_Transmit(&huart4, (uint8_t*)"<cmo>", strlen("<cmo>"), 100);
+  HAL_UART_Transmit(&huart5, (uint8_t*)"<cmo>", strlen("<cmo>"), 100);
   HAL_Delay(500);
 
 
@@ -262,25 +276,33 @@ int main(void)
 	  }
 
 /******EXPERIMENT******/
-	  if (expFlag == 1) {
-		  if (sample_count >= 500){
-			  if (target_force < 15){
-				  target_force++;
-			  }
-			  else if (target_force >= 15){
-				  target_force--;
-			  }
-			  sample_count = 0;
-		  }
-	  }
+
 
 /******MAIN******/
 	  if (tim4Flag == 1){
 		  tim4Flag = 0;
+
+		  if (expFlag == 1) {
+		  		  /*if (sample_count >= 500){
+		  			  if (target_force < 15){
+		  				  target_force++;
+		  			  }
+		  			  else if (target_force >= 15){
+		  				  target_force--;
+		  			  }
+		  			  sample_count = 0;
+		  		  }*/
+		  		  float t = (cycle_counter % 1000) * 0.01f;
+		  		          // 0.1Hz 사인 웨이브 계산 (주기 10초)
+		  		          // -PI/2 위상을 적용하면 t = 0일 때 target_force = 0
+		  		          target_force = ((sin(2 * PI * 0.1f * t - PI/2) + 1) / 2) * 15.0f;
+
+		  		          cycle_counter++;  // 다음 사이클
+		  	  }
 		  //printf("1.12555\r\n");
 
 		  //printf("%f\r\n", LPFEMG2);
-		  printf("%f\r\n", EMGMAF);
+		  //printf("%f\r\n", EMGMAF);
 		  UpdateDeltaTime();
 		  UpdatePIDControl(force);
 
@@ -288,9 +310,11 @@ int main(void)
 		  length = GetMatchingLength(filtered_streth);
 		  //float EMGHPF =
 		  kneeAngleMAF = KneeAngleEstimation();  // 함수 반환값을 변수에 저장
+		  //printf("%f\r\n", length);
 
-		  //printf("%.2f,%.2f,%.2f,%.2f,%.2f\r\n", temp, force, length, kneeAngleMAF, target_force);
-
+		  //printf("%.2f,%.2f,%.2f,%.2f,%.2f,%.2f,%.2f\r\n", temp, length, force, kneeAngleMAF, euler1[0], euler2[0], target_force);
+		  printf("%.2f,%.2f,%.2f,%.2f\r\n", temp, force, length, target_force);
+		  //printf("%.2f, %.2f, %.2f\r\n", pgain, igain, dgain);
 		  sample_count++;
 		  count = 0;
 		  TIM2->CNT = 0;
@@ -390,11 +414,11 @@ static void MX_ADC1_Init(void)
   hadc1.Init.ScanConvMode = DISABLE;
   hadc1.Init.ContinuousConvMode = DISABLE;
   hadc1.Init.DiscontinuousConvMode = DISABLE;
-  hadc1.Init.ExternalTrigConvEdge = ADC_EXTERNALTRIGCONVEDGE_RISING;
-  hadc1.Init.ExternalTrigConv = ADC_EXTERNALTRIGCONV_T8_TRGO;
+  hadc1.Init.ExternalTrigConvEdge = ADC_EXTERNALTRIGCONVEDGE_NONE;
+  hadc1.Init.ExternalTrigConv = ADC_SOFTWARE_START;
   hadc1.Init.DataAlign = ADC_DATAALIGN_RIGHT;
   hadc1.Init.NbrOfConversion = 1;
-  hadc1.Init.DMAContinuousRequests = ENABLE;
+  hadc1.Init.DMAContinuousRequests = DISABLE;
   hadc1.Init.EOCSelection = ADC_EOC_SINGLE_CONV;
   if (HAL_ADC_Init(&hadc1) != HAL_OK)
   {
@@ -403,9 +427,9 @@ static void MX_ADC1_Init(void)
 
   /** Configure for the selected ADC regular channel its corresponding rank in the sequencer and its sample time.
   */
-  sConfig.Channel = ADC_CHANNEL_0;
+  sConfig.Channel = ADC_CHANNEL_1;
   sConfig.Rank = 1;
-  sConfig.SamplingTime = ADC_SAMPLETIME_56CYCLES;
+  sConfig.SamplingTime = ADC_SAMPLETIME_3CYCLES;
   if (HAL_ADC_ConfigChannel(&hadc1, &sConfig) != HAL_OK)
   {
     Error_Handler();
@@ -463,7 +487,7 @@ static void MX_TIM2_Init(void)
   sConfigIC.ICPolarity = TIM_INPUTCHANNELPOLARITY_RISING;
   sConfigIC.ICSelection = TIM_ICSELECTION_DIRECTTI;
   sConfigIC.ICPrescaler = TIM_ICPSC_DIV1;
-  sConfigIC.ICFilter = 15;
+  sConfigIC.ICFilter = 0;
   if (HAL_TIM_IC_ConfigChannel(&htim2, &sConfigIC, TIM_CHANNEL_1) != HAL_OK)
   {
     Error_Handler();
@@ -644,7 +668,7 @@ static void MX_UART4_Init(void)
 
   /* USER CODE END UART4_Init 1 */
   huart4.Instance = UART4;
-  huart4.Init.BaudRate = 115200;
+  huart4.Init.BaudRate = 230400;
   huart4.Init.WordLength = UART_WORDLENGTH_8B;
   huart4.Init.StopBits = UART_STOPBITS_1;
   huart4.Init.Parity = UART_PARITY_NONE;
@@ -677,7 +701,7 @@ static void MX_UART5_Init(void)
 
   /* USER CODE END UART5_Init 1 */
   huart5.Instance = UART5;
-  huart5.Init.BaudRate = 115200;
+  huart5.Init.BaudRate = 230400;
   huart5.Init.WordLength = UART_WORDLENGTH_8B;
   huart5.Init.StopBits = UART_STOPBITS_1;
   huart5.Init.Parity = UART_PARITY_NONE;
@@ -776,7 +800,7 @@ static void MX_USART3_UART_Init(void)
 
   /* USER CODE END USART3_Init 1 */
   huart3.Instance = USART3;
-  huart3.Init.BaudRate = 57600;
+  huart3.Init.BaudRate = 115200;
   huart3.Init.WordLength = UART_WORDLENGTH_8B;
   huart3.Init.StopBits = UART_STOPBITS_1;
   huart3.Init.Parity = UART_PARITY_NONE;
@@ -805,7 +829,7 @@ static void MX_DMA_Init(void)
 
   /* DMA interrupt init */
   /* DMA1_Stream0_IRQn interrupt configuration */
-  HAL_NVIC_SetPriority(DMA1_Stream0_IRQn, 1, 0);
+  HAL_NVIC_SetPriority(DMA1_Stream0_IRQn, 0, 0);
   HAL_NVIC_EnableIRQ(DMA1_Stream0_IRQn);
   /* DMA1_Stream1_IRQn interrupt configuration */
   HAL_NVIC_SetPriority(DMA1_Stream1_IRQn, 1, 0);
@@ -816,9 +840,6 @@ static void MX_DMA_Init(void)
   /* DMA1_Stream5_IRQn interrupt configuration */
   HAL_NVIC_SetPriority(DMA1_Stream5_IRQn, 1, 0);
   HAL_NVIC_EnableIRQ(DMA1_Stream5_IRQn);
-  /* DMA2_Stream0_IRQn interrupt configuration */
-  HAL_NVIC_SetPriority(DMA2_Stream0_IRQn, 0, 0);
-  HAL_NVIC_EnableIRQ(DMA2_Stream0_IRQn);
   /* DMA2_Stream2_IRQn interrupt configuration */
   HAL_NVIC_SetPriority(DMA2_Stream2_IRQn, 1, 0);
   HAL_NVIC_EnableIRQ(DMA2_Stream2_IRQn);
@@ -844,16 +865,13 @@ static void MX_GPIO_Init(void)
   __HAL_RCC_GPIOD_CLK_ENABLE();
 
   /*Configure GPIO pin Output Level */
-  HAL_GPIO_WritePin(GPIOC, GPIO_PIN_0, GPIO_PIN_RESET);
-
-  /*Configure GPIO pin Output Level */
-  HAL_GPIO_WritePin(CG_GPIO_Port, CG_Pin, GPIO_PIN_SET);
+  HAL_GPIO_WritePin(STERTH_CHARGE_GPIO_Port, STERTH_CHARGE_Pin, GPIO_PIN_SET);
 
   /*Configure GPIO pin Output Level */
   HAL_GPIO_WritePin(LD2_GPIO_Port, LD2_Pin, GPIO_PIN_RESET);
 
   /*Configure GPIO pin Output Level */
-  HAL_GPIO_WritePin(MD_DIR_GPIO_Port, MD_DIR_Pin, GPIO_PIN_SET);
+  HAL_GPIO_WritePin(GPIOB, SMA_DIR_Pin|FAN_DIR_Pin, GPIO_PIN_RESET);
 
   /*Configure GPIO pin : B1_Pin */
   GPIO_InitStruct.Pin = B1_Pin;
@@ -861,19 +879,12 @@ static void MX_GPIO_Init(void)
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   HAL_GPIO_Init(B1_GPIO_Port, &GPIO_InitStruct);
 
-  /*Configure GPIO pin : PC0 */
-  GPIO_InitStruct.Pin = GPIO_PIN_0;
-  GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
-  GPIO_InitStruct.Pull = GPIO_NOPULL;
-  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
-  HAL_GPIO_Init(GPIOC, &GPIO_InitStruct);
-
-  /*Configure GPIO pin : CG_Pin */
-  GPIO_InitStruct.Pin = CG_Pin;
+  /*Configure GPIO pin : STERTH_CHARGE_Pin */
+  GPIO_InitStruct.Pin = STERTH_CHARGE_Pin;
   GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_VERY_HIGH;
-  HAL_GPIO_Init(CG_GPIO_Port, &GPIO_InitStruct);
+  HAL_GPIO_Init(STERTH_CHARGE_GPIO_Port, &GPIO_InitStruct);
 
   /*Configure GPIO pin : LD2_Pin */
   GPIO_InitStruct.Pin = LD2_Pin;
@@ -882,12 +893,19 @@ static void MX_GPIO_Init(void)
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
   HAL_GPIO_Init(LD2_GPIO_Port, &GPIO_InitStruct);
 
-  /*Configure GPIO pin : MD_DIR_Pin */
-  GPIO_InitStruct.Pin = MD_DIR_Pin;
+  /*Configure GPIO pin : SMA_DIR_Pin */
+  GPIO_InitStruct.Pin = SMA_DIR_Pin;
   GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_MEDIUM;
-  HAL_GPIO_Init(MD_DIR_GPIO_Port, &GPIO_InitStruct);
+  HAL_GPIO_Init(SMA_DIR_GPIO_Port, &GPIO_InitStruct);
+
+  /*Configure GPIO pin : FAN_DIR_Pin */
+  GPIO_InitStruct.Pin = FAN_DIR_Pin;
+  GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
+  GPIO_InitStruct.Pull = GPIO_NOPULL;
+  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
+  HAL_GPIO_Init(FAN_DIR_GPIO_Port, &GPIO_InitStruct);
 
   /* EXTI interrupt init*/
   HAL_NVIC_SetPriority(EXTI15_10_IRQn, 0, 0);
@@ -996,8 +1014,8 @@ void ProcessData(uint8_t* data, uint16_t len, UART_HandleTypeDef *huart)
             printf(pid_cmd);
         }
     }
-    else if(huart->Instance == USART1){
-		// uart1로 받은 데이터를 온도값으로 파싱하여 temp 변수에 저장
+    else if(huart->Instance == USART3){
+		// uart3로 받은 데이터를 온도값으로 파싱하여 temp 변수에 저장
 		char temp_str[128] = {0};
 		uint16_t copy_len = (len < 127 ? len : 127);
 		memcpy(temp_str, data, copy_len);
@@ -1014,8 +1032,8 @@ void ProcessData(uint8_t* data, uint16_t len, UART_HandleTypeDef *huart)
 			//printf("Failed to parse temp: %s\r\n", temp_str);
 		}
 	}
-    else if(huart->Instance == USART3){
-		// uart3로 받은 데이터를 온도값으로 파싱하여 force 변수에 저장
+    else if(huart->Instance == USART1){
+		// uart1로 받은 데이터를 온도값으로 파싱하여 force 변수에 저장
 		char force_str[128] = {0};
 		uint16_t copy_len = (len < 127 ? len : 127);
 		memcpy(force_str, data, copy_len);
@@ -1025,56 +1043,97 @@ void ProcessData(uint8_t* data, uint16_t len, UART_HandleTypeDef *huart)
 		if(sscanf(force_str, "%f", &new_force) == 1)
 		{
 			force = new_force;
-			//printf("Updated temp: %.2f\r\n", temp);
+			//printf("Updated force: %.2f\r\n", force);
 		}
 		else
 		{
 			//printf("Failed to parse temp: %s\r\n", temp_str);
 		}
 	}
-    else if(huart->Instance == UART4){
+    else if (huart->Instance == UART4) {
         char buf[SBUF_SIZE] = {0};
         uint16_t copy_len = (len < (SBUF_SIZE - 1) ? len : (SBUF_SIZE - 1));
         memcpy(buf, data, copy_len);
         buf[copy_len] = '\0';
-        char *token = strtok(buf, ",");
-        float items[3] = {0};
-        int i = 0;
-        while(token != NULL && i < 3)
-        {
-            items[i] = atof(token);
-            token = strtok(NULL, ",");
-            i++;
+
+        // ✅ '*' 문자가 있는지 확인
+        if (buf[0] != '*') {
+            return;  // '*'이 없으면 데이터 무시
         }
-        // 저장: 허벅지 IMU 데이터를 euler1 배열에 저장
-        euler1[0] = items[0];
-        euler1[1] = items[1];
-        euler1[2] = items[2];
-        //printf("%.2f\r\n", euler1[0]);
+
+        char *payload = buf + 1;  // '*' 다음부터 데이터 시작
+
+        // ✅ CR LF 제거
+        int payload_len = strlen(payload);
+        if (payload_len > 1 && (payload[payload_len - 2] == '\r' && payload[payload_len - 1] == '\n')) {
+            payload[payload_len - 2] = '\0';
+        }
+
+        // ✅ 데이터 파싱
+        char *token = strtok(payload, ",");
+        float items[6] = {0};
+        int i = 0;
+
+        while (token != NULL && i < 6) {
+            if (isdigit(token[0]) || token[0] == '-' || token[0] == '.') {
+                // 숫자일 때만 저장
+                items[i] = atof(token);
+                i++;
+            }
+            token = strtok(NULL, ",");
+        }
+
+        // ✅ 실수 데이터만 저장 (euler1)
+        for (int j = 0; j < 6; j++) {
+            euler1[j] = items[j];
+        }
 
         imu4_flag = 1;
     }
-    else if(huart->Instance == UART5){
+
+    else if (huart->Instance == UART5) {
         char buf[SBUF_SIZE] = {0};
         uint16_t copy_len = (len < (SBUF_SIZE - 1) ? len : (SBUF_SIZE - 1));
         memcpy(buf, data, copy_len);
         buf[copy_len] = '\0';
-        char *token = strtok(buf, ",");
-        float items[3] = {0};
-        int i = 0;
-        while(token != NULL && i < 3)
-        {
-            items[i] = atof(token);
-            token = strtok(NULL, ",");
-            i++;
+
+        // ✅ '*' 문자가 있는지 확인
+        if (buf[0] != '*') {
+            return;
         }
-        euler2[0] = items[0];
-        euler2[1] = items[1];
-        euler2[2] = items[2];
-        printf("%.2f\r\n", euler2[0]);
-        //printf("2\r\n");
+
+        char *payload = buf + 1;
+
+        // ✅ CR LF 제거
+        int payload_len = strlen(payload);
+        if (payload_len > 1 && (payload[payload_len - 2] == '\r' && payload[payload_len - 1] == '\n')) {
+            payload[payload_len - 2] = '\0';
+        }
+
+        // ✅ 데이터 파싱
+        char *token = strtok(payload, ",");
+        float items[6] = {0};
+        int i = 0;
+
+        while (token != NULL && i < 6) {
+            if (isdigit(token[0]) || token[0] == '-' || token[0] == '.') {
+                // 숫자일 때만 저장
+                items[i] = atof(token);
+                i++;
+            }
+            token = strtok(NULL, ",");
+        }
+
+        // ✅ 실수 데이터만 저장 (euler2)
+        for (int j = 0; j < 6; j++) {
+            euler2[j] = items[j];
+        }
+
         imu5_flag = 1;
     }
+
+
+
 }
 /**
  * @brief Estimating the Knee Angle.
@@ -1216,7 +1275,7 @@ void Error_Handler(void)
 /**
   * @brief  Reports the name of the source file and the source line number
   *         where the assert_param error has occurred.
-  * @param  file: pointer to the source file name
+  * @param  file: pointer to the source file0 name
   * @param  line: assert_param error line source number
   * @retval None
   */

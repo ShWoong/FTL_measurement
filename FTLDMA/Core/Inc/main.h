@@ -81,9 +81,11 @@ void ProcessData(uint8_t* data, uint16_t len, UART_HandleTypeDef *huart);
 #define B1_Pin GPIO_PIN_13
 #define B1_GPIO_Port GPIOC
 #define B1_EXTI_IRQn EXTI15_10_IRQn
-#define CG_Pin GPIO_PIN_3
-#define CG_GPIO_Port GPIOC
-#define EMG_Pin GPIO_PIN_0
+#define STERTH_CHARGE_Pin GPIO_PIN_3
+#define STERTH_CHARGE_GPIO_Port GPIOC
+#define STRETCH_CAPTURE_Pin GPIO_PIN_0
+#define STRETCH_CAPTURE_GPIO_Port GPIOA
+#define EMG_Pin GPIO_PIN_1
 #define EMG_GPIO_Port GPIOA
 #define USART_TX_Pin GPIO_PIN_2
 #define USART_TX_GPIO_Port GPIOA
@@ -99,12 +101,12 @@ void ProcessData(uint8_t* data, uint16_t len, UART_HandleTypeDef *huart);
 #define TMS_GPIO_Port GPIOA
 #define TCK_Pin GPIO_PIN_14
 #define TCK_GPIO_Port GPIOA
-#define CAP_Pin GPIO_PIN_15
-#define CAP_GPIO_Port GPIOA
 #define SWO_Pin GPIO_PIN_3
 #define SWO_GPIO_Port GPIOB
-#define MD_DIR_Pin GPIO_PIN_6
-#define MD_DIR_GPIO_Port GPIOB
+#define SMA_DIR_Pin GPIO_PIN_6
+#define SMA_DIR_GPIO_Port GPIOB
+#define FAN_DIR_Pin GPIO_PIN_7
+#define FAN_DIR_GPIO_Port GPIOB
 
 /* USER CODE BEGIN Private defines */
 
