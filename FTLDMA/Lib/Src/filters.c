@@ -30,6 +30,9 @@ float hpf_sos_35[SECTIONS][6] = {
 float hpf_sos_20[SECTIONS][6] = {
     {9.3910e-01, -1.8782e+00, 9.3910e-01, 1.0000e+00, -1.8783e+00, 8.8100e-01},
 };//20Hz
+float hpf_sos_10[SECTIONS][6] = {
+    {9.84106e-01, -1.96821e+00, 9.84106e-01, 1.00000e+00, -1.96922e+00, 9.70982e-01},
+};//10Hz
 float hpf_sos_1[SECTIONS][6] = {
     {9.98404e-01, -1.99681e+00, 9.98404e-01, 1.00000e+00, -1.99679e+00, 9.96810e-01},
 };//1Hz
@@ -43,8 +46,8 @@ float EMGBWHPF(float input) {
 	for (int i = 0; i < SECTIONS; i++) {
 		xn = (i == 0) ? input : output;
 
-		output = hpf_sos_20[i][0] * xn + hpf_sos_20[i][1] * hpf_x_buffer20[i][0] + hpf_sos_20[i][2] * hpf_x_buffer20[i][1]
-		- hpf_sos_20[i][4] * hpf_y_buffer20[i][0] - hpf_sos_20[i][5] * hpf_y_buffer20[i][1];
+		output = hpf_sos_10[i][0] * xn + hpf_sos_10[i][1] * hpf_x_buffer20[i][0] + hpf_sos_10[i][2] * hpf_x_buffer20[i][1]
+		- hpf_sos_10[i][4] * hpf_y_buffer20[i][0] - hpf_sos_10[i][5] * hpf_y_buffer20[i][1];
 
 		hpf_x_buffer20[i][1] = hpf_x_buffer20[i][0];
 		hpf_x_buffer20[i][0] = xn;
@@ -96,6 +99,9 @@ float lpf_sos_4[SECTIONS][6] = {
 float lpf_sos_14[SECTIONS][6] = {
     {2.50000e-01, 5.00000e-01, 2.50000e-01, 1.00000e+00, -1.75100e+00, 7.80000e-01},
 };//14Hz
+float lpf_sos_50[SECTIONS][6] = {
+    {2.5460e-03, 5.0920e-03, 2.5460e-03, 1.00000e+00, -1.85290e+00, 8.6280e-01},
+};//50Hz
 float lpf_sos_53[SECTIONS][6] = {
     {4.8240e-03, 9.6480e-03, 4.8240e-03, 1.0000e+00, -1.7990e+00, 8.1800e-01},
 };//53Hz
@@ -146,8 +152,8 @@ float EMGBWLPF(float input) {
 	for (int i = 0; i < SECTIONS; i++) {
 		xn = (i == 0) ? input : output;
 
-		output = lpf_sos_200[i][0] * xn + lpf_sos_200[i][1] * lpf_x_buffer200[i][0] + lpf_sos_200[i][2] * lpf_x_buffer200[i][1]
-		- lpf_sos_200[i][4] * lpf_y_buffer200[i][0] - lpf_sos_200[i][5] * lpf_y_buffer200[i][1];
+		output = lpf_sos_50[i][0] * xn + lpf_sos_50[i][1] * lpf_x_buffer200[i][0] + lpf_sos_50[i][2] * lpf_x_buffer200[i][1]
+		- lpf_sos_50[i][4] * lpf_y_buffer200[i][0] - lpf_sos_50[i][5] * lpf_y_buffer200[i][1];
 
 		lpf_x_buffer200[i][1] = lpf_x_buffer200[i][0];
 		lpf_x_buffer200[i][0] = xn;

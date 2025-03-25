@@ -101,6 +101,8 @@ void ProcessData(uint8_t* data, uint16_t len, UART_HandleTypeDef *huart);
 #define TMS_GPIO_Port GPIOA
 #define TCK_Pin GPIO_PIN_14
 #define TCK_GPIO_Port GPIOA
+#define FAN_DIR2_Pin GPIO_PIN_15
+#define FAN_DIR2_GPIO_Port GPIOA
 #define SWO_Pin GPIO_PIN_3
 #define SWO_GPIO_Port GPIOB
 #define SMA_DIR_Pin GPIO_PIN_6
