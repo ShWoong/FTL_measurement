@@ -3,13 +3,16 @@
 #define FILTERS_H
 
 #include <stdint.h>
+#include <math.h>
 
 #define FILTER_ORDER 2
 #define SECTIONS 1
 //#define FILTER_TAP_NUM 100
-#define SAMPLE_SIZE 100
+#define SAMPLE_SIZE 10
+#define EMG_SAMPLE_SIZE 5000
 #define FILTER_TAP_NUM 100
 #define HPFILTER_TAP_NUM 101
+#define PI 3.141592f
 
 float EMGBWHPF(float input);
 float EMGBWLPF(float input);
@@ -17,7 +20,7 @@ float BWLPF(float input, int8_t ch);
 float BWLPF_1st(float input, int8_t ch);
 float NEURAL_ACTIVATION(float emg);
 float MUSCLE_ACTIVATION(float neural_activation);
-float FORCE_GENERATION(float muscle_activation, float muscle_fiber_length, float muscle_contraction_velocity);
+float FORCE_GENERATION(float muscle_activation);
 float STRETCH_SENSOR(void);
 float EMG_SENSOR(void);
 void FIR_Init(int num_taps, float cutoff_freq, float fs);

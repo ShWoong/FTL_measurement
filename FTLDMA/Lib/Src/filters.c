@@ -1,4 +1,3 @@
-
 #include <filters.h>
 #include <main.h>
 #include <stdio.h>
@@ -46,8 +45,8 @@ float EMGBWHPF(float input) {
 	for (int i = 0; i < SECTIONS; i++) {
 		xn = (i == 0) ? input : output;
 
-		output = hpf_sos_10[i][0] * xn + hpf_sos_10[i][1] * hpf_x_buffer20[i][0] + hpf_sos_10[i][2] * hpf_x_buffer20[i][1]
-		- hpf_sos_10[i][4] * hpf_y_buffer20[i][0] - hpf_sos_10[i][5] * hpf_y_buffer20[i][1];
+		output = hpf_sos_20[i][0] * xn + hpf_sos_20[i][1] * hpf_x_buffer20[i][0] + hpf_sos_20[i][2] * hpf_x_buffer20[i][1]
+		- hpf_sos_20[i][4] * hpf_y_buffer20[i][0] - hpf_sos_20[i][5] * hpf_y_buffer20[i][1];
 
 		hpf_x_buffer20[i][1] = hpf_x_buffer20[i][0];
 		hpf_x_buffer20[i][0] = xn;
@@ -108,6 +107,13 @@ float lpf_sos_53[SECTIONS][6] = {
 float lpf_sos_200[SECTIONS][6] = {
     {6.7500e-02, 1.3490e-01, 6.7500e-02, 1.0000e+00, -1.1429e+00, 4.1280e-01},
 };//200Hz
+float lpf_sos_3_2700[SECTIONS][6] = {
+    {1.21e-05, 2.42e-05, 1.21e-05, 1.00000000e+00, -1.99000000e+00, 9.90000000e-01},
+}; // 3 Hz 컷오프, fs=2700Hz
+float lpf_sos_4_2700[SECTIONS][6] = {
+    {2.16e-05, 4.32e-05, 2.16e-05, 1.00000000e+00, -1.98600000e+00, 9.87000000e-01},
+}; // 4 Hz 컷오프, fs = 2700 Hz
+
 
 
 float BWLPF(float input, int8_t cf) {
@@ -152,8 +158,8 @@ float EMGBWLPF(float input) {
 	for (int i = 0; i < SECTIONS; i++) {
 		xn = (i == 0) ? input : output;
 
-		output = lpf_sos_50[i][0] * xn + lpf_sos_50[i][1] * lpf_x_buffer200[i][0] + lpf_sos_50[i][2] * lpf_x_buffer200[i][1]
-		- lpf_sos_50[i][4] * lpf_y_buffer200[i][0] - lpf_sos_50[i][5] * lpf_y_buffer200[i][1];
+		output = lpf_sos_4_2700[i][0] * xn + lpf_sos_4_2700[i][1] * lpf_x_buffer200[i][0] + lpf_sos_4_2700[i][2] * lpf_x_buffer200[i][1]
+		- lpf_sos_4_2700[i][4] * lpf_y_buffer200[i][0] - lpf_sos_4_2700[i][5] * lpf_y_buffer200[i][1];
 
 		lpf_x_buffer200[i][1] = lpf_x_buffer200[i][0];
 		lpf_x_buffer200[i][0] = xn;
@@ -342,7 +348,7 @@ float MAF(float new_sample) {
 }
 
 double MAFEMG(double new_sample) {
-    static float samples[SAMPLE_SIZE] = {0};
+    static float samples[EMG_SAMPLE_SIZE] = {0};
     static int index = 0;
     static float sum = 0;
     float average = 0;
@@ -353,10 +359,10 @@ double MAFEMG(double new_sample) {
     samples[index] = new_sample;
     sum += new_sample;
     // 다음 샘플을 위한 인덱스 업데이트
-    index = (index + 1) % SAMPLE_SIZE;
+    index = (index + 1) % EMG_SAMPLE_SIZE;
 
     // 평균 계산
-    average = sum / SAMPLE_SIZE;
+    average = sum / EMG_SAMPLE_SIZE;
 
     return average;
 }
@@ -380,6 +386,9 @@ void KMF_Update(KMF *kf, float measurement) {
 
 /************************************************NEURAL ACTIVATION CALCULATION************************************************/
 float na = 0, nat1 = 0, nat2 = 0;
+float estimated_angle_emg = 0.0f;
+float angle_velocity_emg = 0.0f;
+float estimated_angle_fused = 0.0f;
 
 float NEURAL_ACTIVATION(float emg){
 	float gma1 = -0.75, gma2 = -0.125;
@@ -387,7 +396,7 @@ float NEURAL_ACTIVATION(float emg){
 
 	nat2 = nat1;
 	nat1 = na;
-	na = (alp*emg - bet1*nat1 - bet2*nat2)-4;
+	na = (alp*emg - bet1*nat1 - bet2*nat2);
 	if(na<0){
 	  na=0;
 	}
@@ -397,33 +406,46 @@ float NEURAL_ACTIVATION(float emg){
 
 /************************************************MUSCLE ACTIVATION CALCULATION************************************************/
 float MUSCLE_ACTIVATION(float neural_activation){
-	float A = -0.03, max_value = 33.81404;
-	float ma = (exp(A*neural_activation) - 1)/(exp(A) - 1);
-	float ma_cal = ma/max_value*100;
+	float normalized = neural_activation/3.5;
+	//float A = -0.03, max_value = 33.81404;
+	float A = -0.2;
+	float ma = (exp(A*normalized) - 1)/(exp(A) - 1);
+	//float ma_cal = ma/max_value*100;
+	float ma_cal = ma*100.0-40;
+	if (ma_cal < 0){
+		ma_cal = 0;
+	}
 
 	return (int32_t)round(ma_cal);
 }
 
 /******************************************************TORQUE GENERATION******************************************************/
-float FORCE_GENERATION(float muscle_activation, float muscle_fiber_length, float muscle_contraction_velocity){
-	float q0 = -2.06, q1 = 6.16, q2 = -3.13, pa = 13.9*M_PI/180, lt = 34.6, lm0 = 7.6, Fm0 = 848.8, fA;
-	float lm = lm0*0.5, l = lm/lm0, lmt = lt + lm*cosd(pa);
+float FORCE_GENERATION(float muscle_activation) {
+    float q0 = -2.06f, q1 = 6.16f, q2 = -3.13f;
+    float pa = 13.9f * PI / 180.0f; // pennation angle (radian)
+    float lt = 34.6f;   // 힘줄 길이
+    float lm0 = 7.6f;   // 최적 근섬유 길이
+    float Fm0 = 848.8f; // 최대 등척성 근력
 
-	if(l>=0.5 || l<=1.5){
-		fA = q0 + q1*l + q2*powf(l, 2);
-	}
-	else{
-		fA = 0;
-	}
-	float fP = exp(10*l-15);
-	float fV = 1;
+    // 여기서는 근섬유 길이를 최적 길이의 50%로 가정
+    float lm = lm0 * 0.5f;
+    float l = lm / lm0;
+    float fA = 0.0f;
+    // 유효 범위 검사: 0.5 <= l <= 1.5
+    if (l >= 0.5f && l <= 1.5f) {
+        fA = q0 + q1 * l + q2 * (l * l);
+    } else {
+        fA = 0.0f;
+    }
+    float fP = expf(10.0f * l - 15.0f);
+    float fV = 1.0f; // 수축 속도 계수 (상수로 가정)
 
-	float FmA = fA*fV*muscle_activation*Fm0;
-	float FmP = fP*Fm0;
-	float Fmt = (FmA + FmP)*cos(pa);
-
-	return Fmt;
+    float FmA = fA * fV * muscle_activation * Fm0;
+    float FmP = fP * Fm0;
+    float Fmt = (FmA + FmP) * cosf(pa);
+    return Fmt;
 }
+
 
 /***********************************************STRETCH SENSOR CAP CALCULATION************************************************/
 /*float STRETCH_SENSOR(void){
@@ -443,3 +465,5 @@ float FORCE_GENERATION(float muscle_activation, float muscle_fiber_length, float
 
 	return C;
 }*/
+
+
