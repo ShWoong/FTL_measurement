@@ -327,7 +327,7 @@ float HighPassFilter_Process(float input) {
 }*/
 
 /****************************************************MOVING AVERAGE FILTER****************************************************/
-float MAF(float new_sample) {
+float MAFTemp(float new_sample) {
     static float samples[SAMPLE_SIZE] = {0};
     static int index = 0;
     static float sum = 0;
@@ -347,7 +347,7 @@ float MAF(float new_sample) {
     return average;
 }
 
-double MAFEMG(double new_sample) {
+double MAFPower(double new_sample) {
     static float samples[EMG_SAMPLE_SIZE] = {0};
     static int index = 0;
     static float sum = 0;
@@ -406,7 +406,7 @@ float NEURAL_ACTIVATION(float emg){
 
 /************************************************MUSCLE ACTIVATION CALCULATION************************************************/
 float MUSCLE_ACTIVATION(float neural_activation){
-	float normalized = neural_activation/3.5;
+	float normalized = neural_activation/2;
 	//float A = -0.03, max_value = 33.81404;
 	float A = -0.2;
 	float ma = (exp(A*normalized) - 1)/(exp(A) - 1);

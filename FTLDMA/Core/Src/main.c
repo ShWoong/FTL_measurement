@@ -332,7 +332,7 @@ int main(void)
           else{
         	  test = 0;
           }
-          printf("%.2f,%.2f,%.2f,%.2f,%.2f\r\n", muscle_MAF, test, target_force, force, temp);
+          printf("%.2f,%.2f\r\n", muscle_MAF, target_force);
 
           sample_count++;
           count = 0;

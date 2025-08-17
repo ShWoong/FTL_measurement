@@ -8,7 +8,7 @@
 #define FILTER_ORDER 2
 #define SECTIONS 1
 //#define FILTER_TAP_NUM 100
-#define SAMPLE_SIZE 10
+#define SAMPLE_SIZE 5
 #define EMG_SAMPLE_SIZE 5000
 #define FILTER_TAP_NUM 100
 #define HPFILTER_TAP_NUM 101
